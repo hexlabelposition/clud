@@ -30,7 +30,7 @@ Milestones and tasks for Clud. Architecture and decisions behind these tasks are
 Goal: an empty but complete skeleton that builds, tests and deploys.
 
 - [ ] **M0-01** Repository skeleton: `web/`, `server/`, `cli/`, `api/`, `LICENSE` (AGPL-3.0), `.editorconfig`, `.gitignore`
-- [ ] **M0-02** Server: Spring Boot, Java 21, Gradle; Spring Modulith with a module verification test
+- [ ] **M0-02** Server: Spring Boot, Java 25, Gradle; Spring Modulith with a module verification test
 - [ ] **M0-03** Server: PostgreSQL, Flyway, base integration test with Testcontainers
 - [ ] **M0-04** Server: configuration via `CLUD_*` environment variables, `GET /api/v1/health`
 - [ ] **M0-05** Server: global error handling with RFC 9457 Problem Details

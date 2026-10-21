@@ -109,7 +109,7 @@ Clud is a monorepository of independent applications. Each one uses the native t
 ```text
 clud/
 ├── web/                     # Next.js, React, TypeScript
-├── server/                  # Java 21, Spring Boot, Gradle
+├── server/                  # Java 25, Spring Boot, Gradle
 ├── cli/                     # Go
 ├── api/
 │   └── openapi.yaml         # API contract, generated from the server
@@ -128,7 +128,7 @@ clud/
 | Part   | Stack |
 |--------|-------|
 | Web    | Next.js, React, TypeScript, Tailwind CSS, Base UI, Zod, openapi-fetch, Playwright |
-| Server | Java 21, Spring Boot, Spring Web, Spring Security, Spring Session JDBC, Spring Data JPA, Spring Modulith, Flyway, springdoc-openapi, Testcontainers |
+| Server | Java 25, Spring Boot, Spring Web, Spring Security, Spring Session JDBC, Spring Data JPA, Spring Modulith, Flyway, springdoc-openapi, Testcontainers |
 | CLI    | Go, cobra, oapi-codegen |
 | Data   | PostgreSQL; local filesystem, MinIO or S3 for file contents |
 | Deploy | Docker, Docker Compose, Caddy |

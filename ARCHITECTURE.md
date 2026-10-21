@@ -97,14 +97,14 @@ Rules:
 
 ## 5. Server
 
-Stack: Java 21, Spring Boot, Spring Web, Spring Security, Spring Session JDBC, Spring Data JPA (Hibernate), Bean Validation, Spring Modulith, Flyway, springdoc-openapi, Testcontainers.
+Stack: Java 25, Spring Boot, Spring Web, Spring Security, Spring Session JDBC, Spring Data JPA (Hibernate), Bean Validation, Spring Modulith, Flyway, springdoc-openapi, Testcontainers.
 
 ### 5.1 Modular monolith
 
 The Server is one deployable application split into modules with explicit boundaries. Boundaries are enforced by **Spring Modulith**: a test verifies that modules only use each other's public API and that there are no dependency cycles.
 
 ```text
-server/src/main/java/.../clud
+server/src/main/java/.../clud/server
 ├── common       shared kernel: IDs, errors, pagination
 ├── users        users, roles, quota limits
 ├── auth         sessions, personal access tokens, invites, first-run setup
