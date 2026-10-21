@@ -149,4 +149,6 @@ make openapi   # regenerate api/openapi.yaml and the Web/CLI clients
 
 ## License
 
+Copyright (C) 2026 Vladyslav Kudriashov
+
 Clud is licensed under the [GNU Affero General Public License v3.0](LICENSE).
