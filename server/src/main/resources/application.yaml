@@ -1,3 +1,7 @@
 spring:
   application:
     name: server
+  datasource:
+    url: jdbc:postgresql://localhost:5432/clud
+    username: clud
+    password: clud
