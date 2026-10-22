@@ -17,7 +17,8 @@ export default defineConfig({
   webServer: process.env.PLAYWRIGHT_BASE_URL
     ? undefined
     : {
-        command: "pnpm dev",
+        // The local CLI also works in the browser image without a package manager.
+        command: "node node_modules/next/dist/bin/next dev",
         url: baseURL,
         reuseExistingServer: !process.env.CI,
       },

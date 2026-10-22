@@ -50,8 +50,20 @@ jobs:
       - run: pnpm typecheck
       - run: pnpm format:check
       - run: pnpm build
-      - run: pnpm exec playwright install --with-deps chromium
-      - run: pnpm test:e2e
+      - name: Pull the Playwright image
+        run: bash ../.github/scripts/playwright.sh pull
+      - name: Test the Web dev server in the Playwright image
+        timeout-minutes: 5
+        run: bash ../.github/scripts/playwright.sh
+      - name: Upload Web test failure diagnostics
+        if: failure()
+        uses: actions/upload-artifact@v7
+        with:
+          name: web-failure-diagnostics
+          path: |
+            web/playwright-report/
+            web/test-results/
+          retention-days: 7
 
   cli:
     runs-on: ubuntu-latest
@@ -92,8 +104,6 @@ jobs:
           cache-dependency-path: web/pnpm-lock.yaml
       - run: pnpm install --frozen-lockfile
         working-directory: web
-      - run: pnpm exec playwright install --with-deps chromium
-        working-directory: web
       - name: Build production images
         run: docker compose build
       # Each run gets its own project and fresh database volume.
@@ -105,9 +115,12 @@ jobs:
           curl --fail --silent --show-error
           --retry 30 --retry-delay 2 --retry-all-errors --retry-max-time 120
           --max-time 5 "$CLUD_PUBLIC_URL/api/v1/health"
+      - name: Pull the Playwright image
+        run: bash ../.github/scripts/playwright.sh pull
+        working-directory: web
       - name: Test the production stack through Caddy
         timeout-minutes: 5
-        run: pnpm test:e2e --reporter=github,html
+        run: bash ../.github/scripts/playwright.sh
         working-directory: web
       - name: Collect Compose diagnostics
         if: failure()
