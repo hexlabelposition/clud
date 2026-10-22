@@ -41,8 +41,8 @@ Goal: an empty but complete skeleton that builds, tests and deploys.
 - [x] **M0-10** Dockerfiles for Server and Web
 - [x] **M0-11** `Caddyfile`: `/api/*` → server, everything else → web
 - [x] **M0-12** `docker-compose.yml` (caddy, web, server, postgres) and `docker-compose.dev.yml` (postgres, caddy → host)
-- [ ] **M0-13** `.env.example` with all supported variables
-- [ ] **M0-14** `Makefile`: `dev`, `test`, `build`, `lint`, `openapi`
+- [x] **M0-13** `.env.example` with all supported variables
+- [x] **M0-14** `Makefile`: `dev`, `test`, `build`, `lint`, `openapi`
 - [ ] **M0-15** CI (GitHub Actions): build and test all three apps; fail if `api/openapi.yaml` is out of date
 
 **Done when:** `docker compose up -d` on a clean machine serves a placeholder Web page at `CLUD_PUBLIC_URL` that shows the Server health status fetched through the generated client, and CI is green.
