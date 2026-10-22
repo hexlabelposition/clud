@@ -33,7 +33,7 @@ Goal: an empty but complete skeleton that builds, tests and deploys.
 - [x] **M0-02** Server: Spring Boot, Java 25, Gradle; Spring Modulith with a module verification test
 - [x] **M0-03** Server: PostgreSQL, Flyway, base integration test with Testcontainers
 - [x] **M0-04** Server: configuration via `CLUD_*` environment variables, `GET /api/v1/health`
-- [ ] **M0-05** Server: global error handling with RFC 9457 Problem Details
+- [x] **M0-05** Server: global error handling with RFC 9457 Problem Details
 - [ ] **M0-06** Web: Next.js, TypeScript, Tailwind CSS, Base UI, lint and format, Playwright setup
 - [ ] **M0-07** CLI: Go module, cobra, `clud version`
 - [ ] **M0-08** API contract: springdoc generates `api/openapi.yaml` via a Gradle task
