@@ -10,6 +10,9 @@ spring:
     schemas: ${POSTGRES_SCHEMA:public}
   jpa:
     open-in-view: false
+    hibernate:
+      # Flyway owns the schema; Hibernate only checks that entities match it.
+      ddl-auto: validate
 
 springdoc:
   api-docs:

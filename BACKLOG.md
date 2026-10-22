@@ -53,7 +53,7 @@ Goal: an empty but complete skeleton that builds, tests and deploys.
 
 Goal: a multi-user instance with an admin and invite-based registration.
 
-- [ ] **M1-01** `users` module: user entity, roles `USER` / `ADMIN`, quota limit field
+- [x] **M1-01** `users` module: user entity, roles `USER` / `ADMIN`, quota limit field
 - [ ] **M1-02** Password hashing with `DelegatingPasswordEncoder`
 - [ ] **M1-03** First-run setup: API reports whether setup is needed; first account becomes admin
 - [ ] **M1-04** Login and logout with Spring Session JDBC; cookie `HttpOnly`, `Secure`, `SameSite=Lax`

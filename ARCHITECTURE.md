@@ -238,6 +238,9 @@ spring_session, spring_session_attributes      -- Spring Session JDBC
 
 All IDs are **UUIDv7**, generated in the application.
 
+Usernames consist of ASCII letters, digits, `.`, `_` and `-` (at most 64 characters) and are unique case-insensitively, with the original case preserved. Email is optional and stored trimmed and lowercased.
+For `users.quota_bytes`, `NULL` means unlimited storage and `0` means no storage is allowed.
+
 The schema is managed by **Flyway** migrations.
 
 ### 8.3 Tree rules
