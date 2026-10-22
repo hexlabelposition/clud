@@ -2,6 +2,15 @@ spring:
   application:
     name: server
   datasource:
-    url: jdbc:postgresql://localhost:5432/clud
-    username: clud
-    password: clud
+    url: jdbc:postgresql://${POSTGRES_HOST:localhost}:${POSTGRES_PORT:5432}/${POSTGRES_DB}?currentSchema=${POSTGRES_SCHEMA:public}
+    username: ${POSTGRES_USER}
+    password: ${POSTGRES_PASSWORD}
+    driver-class-name: org.postgresql.Driver
+  flyway:
+    schemas: ${POSTGRES_SCHEMA:public}
+  jpa:
+    open-in-view: false
+
+# Bound from CLUD_* environment variables, e.g. CLUD_PUBLIC_URL → clud.public-url.
+clud:
+  public-url: http://localhost
