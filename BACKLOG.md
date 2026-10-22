@@ -37,7 +37,7 @@ Goal: an empty but complete skeleton that builds, tests and deploys.
 - [x] **M0-06** Web: Next.js, TypeScript, Tailwind CSS, Base UI, lint and format, Playwright setup
 - [ ] **M0-07** CLI: Go module, cobra, `clud version`
 - [x] **M0-08** API contract: springdoc generates `api/openapi.yaml` via a Gradle task
-- [ ] **M0-09** Client generation: `openapi-typescript` + `openapi-fetch` in Web, `oapi-codegen` in CLI
+- [x] **M0-09** Client generation: `openapi-typescript` + `openapi-fetch` in Web, `oapi-codegen` in CLI
 - [ ] **M0-10** Dockerfiles for Server and Web
 - [ ] **M0-11** `Caddyfile`: `/api/*` → server, everything else → web
 - [ ] **M0-12** `docker-compose.yml` (caddy, web, server, postgres) and `docker-compose.dev.yml` (postgres, caddy → host)
