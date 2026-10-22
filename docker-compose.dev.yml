@@ -1,0 +1,32 @@
+# Development: PostgreSQL and Caddy in Docker, Server and Web on the host.
+#   cp .env.example .env
+#   docker compose -f docker-compose.dev.yml up -d
+#   http://localhost  →  /api/* → host:8080 (Server), /* → host:3000 (Web)
+
+services:
+  postgres:
+    image: postgres:18
+    environment:
+      POSTGRES_DB: ${POSTGRES_DB}
+      POSTGRES_USER: ${POSTGRES_USER}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
+    ports:
+      - "${POSTGRES_PORT}:5432"
+    volumes:
+      - postgres-data:/var/lib/postgresql
+
+  caddy:
+    image: caddy:2
+    environment:
+      CLUD_PUBLIC_URL: ${CLUD_PUBLIC_URL}
+      SERVER_UPSTREAM: host.docker.internal:8080
+      WEB_UPSTREAM: host.docker.internal:3000
+    ports:
+      - "80:80"
+    volumes:
+      - ./Caddyfile:/etc/caddy/Caddyfile:ro
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
+
+volumes:
+  postgres-data:

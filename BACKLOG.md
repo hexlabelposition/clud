@@ -38,9 +38,9 @@ Goal: an empty but complete skeleton that builds, tests and deploys.
 - [x] **M0-07** CLI: Go module, cobra, `clud version`
 - [x] **M0-08** API contract: springdoc generates `api/openapi.yaml` via a Gradle task
 - [x] **M0-09** Client generation: `openapi-typescript` + `openapi-fetch` in Web, `oapi-codegen` in CLI
-- [ ] **M0-10** Dockerfiles for Server and Web
-- [ ] **M0-11** `Caddyfile`: `/api/*` → server, everything else → web
-- [ ] **M0-12** `docker-compose.yml` (caddy, web, server, postgres) and `docker-compose.dev.yml` (postgres, caddy → host)
+- [x] **M0-10** Dockerfiles for Server and Web
+- [x] **M0-11** `Caddyfile`: `/api/*` → server, everything else → web
+- [x] **M0-12** `docker-compose.yml` (caddy, web, server, postgres) and `docker-compose.dev.yml` (postgres, caddy → host)
 - [ ] **M0-13** `.env.example` with all supported variables
 - [ ] **M0-14** `Makefile`: `dev`, `test`, `build`, `lint`, `openapi`
 - [ ] **M0-15** CI (GitHub Actions): build and test all three apps; fail if `api/openapi.yaml` is out of date

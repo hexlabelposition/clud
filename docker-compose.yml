@@ -1,28 +1,59 @@
-# Development: PostgreSQL and Caddy in Docker, Server and Web on the host.
-#   cp .env.example .env
+# Clud: Caddy, Web, Server and PostgreSQL.
+#   cp .env.example .env    # set CLUD_PUBLIC_URL and POSTGRES_PASSWORD
 #   docker compose up -d
-#   http://localhost  →  /api/* → host:8080 (Server), /* → host:3000 (Web)
 
 services:
+  caddy:
+    image: caddy:2
+    restart: unless-stopped
+    environment:
+      CLUD_PUBLIC_URL: ${CLUD_PUBLIC_URL}
+    ports:
+      - "80:80"
+      - "443:443"
+      - "443:443/udp"
+    volumes:
+      - ./Caddyfile:/etc/caddy/Caddyfile:ro
+      - caddy-data:/data
+      - caddy-config:/config
+    depends_on:
+      - web
+      - server
+
+  web:
+    build: ./web
+    restart: unless-stopped
+
+  server:
+    build: ./server
+    restart: unless-stopped
+    environment:
+      POSTGRES_HOST: postgres
+      POSTGRES_DB: ${POSTGRES_DB}
+      POSTGRES_SCHEMA: ${POSTGRES_SCHEMA}
+      POSTGRES_USER: ${POSTGRES_USER}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
+      CLUD_PUBLIC_URL: ${CLUD_PUBLIC_URL}
+    depends_on:
+      postgres:
+        condition: service_healthy
+
   postgres:
     image: postgres:18
+    restart: unless-stopped
     environment:
       POSTGRES_DB: ${POSTGRES_DB}
       POSTGRES_USER: ${POSTGRES_USER}
       POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
-    ports:
-      - "${POSTGRES_PORT}:5432"
     volumes:
       - postgres-data:/var/lib/postgresql
-
-  caddy:
-    image: caddy:2
-    ports:
-      - "80:80"
-    volumes:
-      - ./Caddyfile:/etc/caddy/Caddyfile:ro
-    extra_hosts:
-      - "host.docker.internal:host-gateway"
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U $${POSTGRES_USER} -d $${POSTGRES_DB}"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
 
 volumes:
+  caddy-data:
+  caddy-config:
   postgres-data:

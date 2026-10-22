@@ -52,6 +52,11 @@ dependencyManagement {
 	}
 }
 
+// Only the executable boot jar is needed.
+tasks.jar {
+	enabled = false
+}
+
 val openapiSpec = layout.projectDirectory.file("../api/openapi.yaml")
 
 tasks.withType<Test> {

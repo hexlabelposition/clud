@@ -1,8 +1,10 @@
-:80 {
+# The site address is the public URL: an https:// URL with a domain gets a
+# certificate automatically, http:// serves plain HTTP (LAN, behind a tunnel).
+{$CLUD_PUBLIC_URL} {
 	handle /api/* {
-		reverse_proxy host.docker.internal:8080
+		reverse_proxy {$SERVER_UPSTREAM:server:8080}
 	}
 	handle {
-		reverse_proxy host.docker.internal:3000
+		reverse_proxy {$WEB_UPSTREAM:web:3000}
 	}
 }
