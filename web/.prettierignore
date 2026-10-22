@@ -1,0 +1,5 @@
+pnpm-lock.yaml
+# Written by `next dev`.
+AGENTS.md
+playwright-report/
+test-results/
