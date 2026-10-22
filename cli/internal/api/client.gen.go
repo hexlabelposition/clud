@@ -212,11 +212,18 @@ type HealthResponse struct {
 	HTTPResponse *http.Response
 	// JSON200 the response for an HTTP 200 `application/json` response
 	JSON200 *Health
+	// JSON503 the response for an HTTP 503 `application/json` response
+	JSON503 *Health
 }
 
 // GetJSON200 returns the response for an HTTP 200 `application/json` response
 func (r HealthResponse) GetJSON200() *Health {
 	return r.JSON200
+}
+
+// GetJSON503 returns the response for an HTTP 503 `application/json` response
+func (r HealthResponse) GetJSON503() *Health {
+	return r.JSON503
 }
 
 // GetBody returns the raw response body bytes
@@ -279,6 +286,13 @@ func ParseHealthResponse(rsp *http.Response) (*HealthResponse, error) {
 			return nil, err
 		}
 		response.JSON200 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 503:
+		var dest Health
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON503 = &dest
 
 	}
 

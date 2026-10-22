@@ -14,7 +14,13 @@ paths:
             application/json:
               schema:
                 $ref: "#/components/schemas/Health"
-          description: OK
+          description: Server is healthy
+        "503":
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Health"
+          description: Database is unavailable
       tags:
       - Health
 components:

@@ -10,8 +10,10 @@ import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.RestController;
 
+import io.swagger.v3.oas.annotations.media.Content;
 import io.swagger.v3.oas.annotations.media.Schema;
 import io.swagger.v3.oas.annotations.media.Schema.RequiredMode;
+import io.swagger.v3.oas.annotations.responses.ApiResponse;
 import io.swagger.v3.oas.annotations.tags.Tag;
 
 /**
@@ -31,6 +33,10 @@ class HealthController {
 	}
 
 	@GetMapping("/api/v1/health")
+	@ApiResponse(responseCode = "200", description = "Server is healthy",
+			content = @Content(mediaType = "application/json", schema = @Schema(implementation = Health.class)))
+	@ApiResponse(responseCode = "503", description = "Database is unavailable",
+			content = @Content(mediaType = "application/json", schema = @Schema(implementation = Health.class)))
 	ResponseEntity<Health> health() {
 		if (!isDatabaseAvailable()) {
 			return ResponseEntity.status(HttpStatus.SERVICE_UNAVAILABLE).body(new Health(Status.DOWN));
