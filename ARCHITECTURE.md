@@ -151,7 +151,8 @@ A Clud instance is **multi-user**.
 - Login creates a server-side session stored in PostgreSQL (Spring Session JDBC), so sessions survive restarts.
 - Session cookie: `HttpOnly`, `Secure`, `SameSite=Lax`.
 - State-changing requests authenticated by cookie require a CSRF token.
-- Passwords are hashed with Spring Security's `DelegatingPasswordEncoder` (bcrypt by default; the algorithm can be upgraded later without a migration).
+- Passwords are hashed with Spring Security's `DelegatingPasswordEncoder`, configured by `PasswordEncoderFactories` in `auth`. New hashes use bcrypt and retain the `{bcrypt}` prefix in `users.password_hash`, so the algorithm can be upgraded later without a migration.
+- bcrypt rejects passwords longer than 72 bytes of UTF-8 (about 36 Cyrillic letters), so every endpoint that sets a password validates this limit and returns a validation error instead of failing.
 - Login attempts are rate-limited.
 
 ### 6.3 CLI and integrations: personal access tokens

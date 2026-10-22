@@ -37,6 +37,15 @@ class UserRepositoryTests {
 	@Autowired
 	JdbcTemplate jdbc;
 
+	@Test
+	void preservesFullPasswordHash() {
+		String hash = "{bcrypt}$2a$10$dXJ3SW6G7P50lGmMkkmwe.20cQQubK3.HZWzG3YB1tlRy.fqvM/BG";
+		User saved = users.saveAndFlush(new User("alice", null, hash, Role.USER, null));
+		entityManager.clear();
+
+		assertThat(users.findById(saved.getId()).orElseThrow().getPasswordHash()).isEqualTo(hash);
+	}
+
 	@ParameterizedTest
 	@EnumSource(Role.class)
 	void persistsUserWithUuidV7AndRole(Role role) {
