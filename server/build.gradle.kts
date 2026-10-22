@@ -29,6 +29,7 @@ dependencies {
 	implementation("org.flywaydb:flyway-database-postgresql")
 	implementation("org.springframework.modulith:spring-modulith-starter-core")
 	implementation("org.springframework.modulith:spring-modulith-starter-jpa")
+	implementation("org.springdoc:springdoc-openapi-starter-webmvc-api:3.1.1")
 	runtimeOnly("org.postgresql:postgresql")
 	runtimeOnly("org.springframework.modulith:spring-modulith-runtime")
 	annotationProcessor("org.springframework.boot:spring-boot-configuration-processor")
@@ -51,6 +52,23 @@ dependencyManagement {
 	}
 }
 
+val openapiSpec = layout.projectDirectory.file("../api/openapi.yaml")
+
 tasks.withType<Test> {
 	useJUnitPlatform()
+	systemProperty("clud.openapi.file", openapiSpec.asFile.absolutePath)
+	inputs.files(openapiSpec).withPropertyName("openapiSpec")
+}
+
+// The regular test run fails if api/openapi.yaml is out of date; this task rewrites it.
+tasks.register<Test>("openapi") {
+	description = "Writes the OpenAPI specification to api/openapi.yaml."
+	group = "documentation"
+	testClassesDirs = sourceSets.test.get().output.classesDirs
+	classpath = sourceSets.test.get().runtimeClasspath
+	filter {
+		includeTestsMatching("dev.clud.server.OpenApiSpecTests")
+	}
+	systemProperty("clud.openapi.update", "true")
+	outputs.upToDateWhen { false }
 }

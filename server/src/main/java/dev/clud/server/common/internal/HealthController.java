@@ -10,10 +10,13 @@ import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.RestController;
 
+import io.swagger.v3.oas.annotations.tags.Tag;
+
 /**
  * Reports whether the Server can serve requests. Used by the Web app, Docker
  * healthchecks and monitoring.
  */
+@Tag(name = "Health")
 @RestController
 class HealthController {
 

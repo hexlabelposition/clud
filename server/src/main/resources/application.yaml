@@ -11,6 +11,12 @@ spring:
   jpa:
     open-in-view: false
 
+springdoc:
+  api-docs:
+    path: /api/v1/openapi
+  default-produces-media-type: application/json
+  writer-with-order-by-keys: true
+
 # Bound from CLUD_* environment variables, e.g. CLUD_PUBLIC_URL → clud.public-url.
 clud:
   public-url: http://localhost

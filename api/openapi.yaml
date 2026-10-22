@@ -1,0 +1,29 @@
+openapi: 3.1.0
+info:
+  title: Clud API
+  version: v1
+servers:
+- url: /
+paths:
+  /api/v1/health:
+    get:
+      operationId: health
+      responses:
+        "200":
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Health"
+          description: OK
+      tags:
+      - Health
+components:
+  schemas:
+    Health:
+      type: object
+      properties:
+        status:
+          type: string
+          enum:
+          - UP
+          - DOWN

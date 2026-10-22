@@ -11,13 +11,13 @@ import org.springframework.web.servlet.HandlerExceptionResolver;
 class SecurityConfiguration {
 
 	// Authentication (sessions, personal access tokens, CSRF) arrives in M1; until
-	// then only health is reachable.
+	// then only health and the API specification are reachable.
 	@Bean
 	SecurityFilterChain securityFilterChain(HttpSecurity http,
 			@Qualifier("handlerExceptionResolver") HandlerExceptionResolver exceptionResolver) {
 		return http
 				.authorizeHttpRequests(requests -> requests
-						.requestMatchers("/api/v1/health").permitAll()
+						.requestMatchers("/api/v1/health", "/api/v1/openapi", "/api/v1/openapi.yaml").permitAll()
 						.anyRequest().authenticated())
 				// Security errors happen outside Spring MVC; hand them over so they are
 				// rendered as Problem Details like any other error.
