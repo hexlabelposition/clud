@@ -1,1 +1,5 @@
 .env
+
+# OS and editors
+.DS_Store
+.idea/
