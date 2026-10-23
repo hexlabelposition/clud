@@ -143,6 +143,8 @@ Clud runs as a single Server instance. If multiple instances are ever needed, jo
 A Clud instance is **multi-user**.
 
 - On a fresh instance, the Web app shows a first-run screen; the first account created becomes the **admin**.
+- `GET /api/v1/setup` reports `setupNeeded`; `POST /api/v1/setup` accepts `username`, `password` and optional `email`, creates the admin and returns `201` without starting a session. Any existing account closes setup (`409`), including for concurrent requests; the check and insert are serialized by a PostgreSQL table lock in one transaction.
+- Until setup completes, whoever reaches a fresh instance first becomes the admin. Complete setup before exposing the instance publicly; if this proves insufficient, setup can require a one-time token printed to the Server log or set via an environment variable.
 - Registration mode is configurable: `invite` (default), `open` or `closed`.
 - Admins create invites; an invite is a single-use token with an expiry.
 
@@ -151,6 +153,7 @@ A Clud instance is **multi-user**.
 - Login creates a server-side session stored in PostgreSQL (Spring Session JDBC), so sessions survive restarts.
 - Session cookie: `HttpOnly`, `Secure`, `SameSite=Lax`.
 - State-changing requests authenticated by cookie require a CSRF token.
+- `POST /api/v1/setup` is exempt from CSRF: it neither authenticates by cookie nor starts a session, and accepts only `application/json`, which a cross-site form cannot send. Revisit the exemption when CSRF tokens land (M1-05): if the Web app sends the token on every mutation anyway, drop it.
 - Passwords are hashed with Spring Security's `DelegatingPasswordEncoder`, configured by `PasswordEncoderFactories` in `auth`. New hashes use bcrypt and retain the `{bcrypt}` prefix in `users.password_hash`, so the algorithm can be upgraded later without a migration.
 - bcrypt rejects passwords longer than 72 bytes of UTF-8 (about 36 Cyrillic letters), so every endpoint that sets a password validates this limit and returns a validation error instead of failing.
 - Login attempts are rate-limited.
