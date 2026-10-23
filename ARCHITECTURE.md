@@ -151,11 +151,17 @@ A Clud instance is **multi-user**.
 ### 6.2 Web: cookie sessions
 
 - Login creates a server-side session stored in PostgreSQL (Spring Session JDBC), so sessions survive restarts.
-- Session cookie: `HttpOnly`, `Secure`, `SameSite=Lax`.
+- Session cookie: `HttpOnly`, `SameSite=Lax`, and `Secure` when `CLUD_PUBLIC_URL` uses `https`. Browsers drop `Secure` cookies received over plain HTTP (except on `localhost`), so an `http://` instance, e.g. LAN only, sends the cookie without `Secure`.
+- `POST /api/v1/auth/login` accepts JSON `username` and `password`, returns `204`, rotates the session ID and issues the `SESSION` cookie. Username matching ignores case. Invalid credentials and disabled accounts return the same `401` Problem Details response; account status is checked only after the password matches, so a disabled account is not revealed by a faster response.
+- The session stores the user's UUID as the principal name and their role, with credentials erased before persistence. Sessions expire after 30 minutes of inactivity. Flyway owns the JDBC session tables.
+- `POST /api/v1/auth/logout` returns `204`, invalidates the JDBC session and clears its cookie. It also accepts anonymous sessions so clients can safely repeat logout, but like any mutation it needs a valid CSRF token: once the session has expired, fetch a fresh token first or expect `403`.
+- Existing sessions are not revoked when an account changes: a disabled account or a changed role keeps working until the session expires, which an active client can postpone indefinitely. Change password (M1-10) and disabling a user must delete the user's other sessions; the principal name is the user UUID, so `FindByIndexNameSessionRepository` can find them.
 - State-changing requests authenticated by cookie require a CSRF token.
-- `POST /api/v1/setup` is exempt from CSRF: it neither authenticates by cookie nor starts a session, and accepts only `application/json`, which a cross-site form cannot send. Revisit the exemption when CSRF tokens land (M1-05): if the Web app sends the token on every mutation anyway, drop it.
+- `GET /api/v1/auth/csrf` returns `headerName` and `token`, creating an anonymous session if necessary. Keep its cookie and send the token in the indicated header on login and logout. Fetch a fresh token after login or logout; both clear the previous token.
+- Every `GET /api/v1/auth/csrf` without a cookie stores an anonymous session row for 30 minutes, so an unauthenticated client can create many rows. Cover the endpoint with rate limiting (M1-09); if that is not enough, switch to `CookieCsrfTokenRepository`, which keeps the token out of the database.
+- `POST /api/v1/setup` is exempt from CSRF: it neither authenticates by cookie nor starts a session, and accepts only `application/json`, which a cross-site form cannot send. It stays exempt now that CSRF tokens exist: a token would protect no cookie authority and would make setup create an anonymous session first.
 - Passwords are hashed with Spring Security's `DelegatingPasswordEncoder`, configured by `PasswordEncoderFactories` in `auth`. New hashes use bcrypt and retain the `{bcrypt}` prefix in `users.password_hash`, so the algorithm can be upgraded later without a migration.
-- bcrypt rejects passwords longer than 72 bytes of UTF-8 (about 36 Cyrillic letters), so every endpoint that sets a password validates this limit and returns a validation error instead of failing.
+- bcrypt rejects passwords longer than 72 bytes of UTF-8 (about 36 Cyrillic letters), so every endpoint that sets a password validates this limit and returns a validation error instead of failing. Setup and login each check it in their request records; extract a shared constraint once change password (M1-10) needs it too.
 - Login attempts are rate-limited.
 
 ### 6.3 CLI and integrations: personal access tokens

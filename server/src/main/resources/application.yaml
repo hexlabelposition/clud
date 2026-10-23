@@ -8,11 +8,24 @@ spring:
     driver-class-name: org.postgresql.Driver
   flyway:
     schemas: ${POSTGRES_SCHEMA:public}
+  session:
+    timeout: 30m
+    jdbc:
+      # Flyway owns the Spring Session tables (V2).
+      initialize-schema: never
   jpa:
     open-in-view: false
     hibernate:
       # Flyway owns the schema; Hibernate only checks that entities match it.
       ddl-auto: validate
+
+server:
+  servlet:
+    session:
+      cookie:
+        http-only: true
+        # Secure is derived from the scheme of clud.public-url.
+        same-site: lax
 
 springdoc:
   api-docs:
