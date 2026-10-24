@@ -34,6 +34,7 @@ services:
       POSTGRES_USER: ${POSTGRES_USER}
       POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
       CLUD_PUBLIC_URL: ${CLUD_PUBLIC_URL}
+      CLUD_REGISTRATION_MODE: ${CLUD_REGISTRATION_MODE:-invite}
     depends_on:
       postgres:
         condition: service_healthy

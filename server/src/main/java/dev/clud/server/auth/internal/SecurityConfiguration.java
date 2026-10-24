@@ -29,6 +29,7 @@ class SecurityConfiguration {
 				.authorizeHttpRequests(requests -> requests
 						.requestMatchers("/api/v1/health", "/api/v1/openapi", "/api/v1/openapi.yaml", "/api/v1/setup").permitAll()
 						.requestMatchers("/api/v1/auth/csrf", "/api/v1/auth/login", "/api/v1/auth/logout").permitAll()
+						.requestMatchers("/api/v1/auth/registration", "/api/v1/auth/register").permitAll()
 						.anyRequest().authenticated())
 				// Security errors happen outside Spring MVC; hand them over so they are
 				// rendered as Problem Details like any other error.

@@ -145,7 +145,10 @@ A Clud instance is **multi-user**.
 - On a fresh instance, the Web app shows a first-run screen; the first account created becomes the **admin**.
 - `GET /api/v1/setup` reports `setupNeeded`; `POST /api/v1/setup` accepts `username`, `password` and optional `email`, creates the admin and returns `201` without starting a session. Any existing account closes setup (`409`), including for concurrent requests; the check and insert are serialized by a PostgreSQL table lock in one transaction.
 - Until setup completes, whoever reaches a fresh instance first becomes the admin. Complete setup before exposing the instance publicly; if this proves insufficient, setup can require a one-time token printed to the Server log or set via an environment variable.
-- Registration mode is configurable: `invite` (default), `open` or `closed`.
+- `CLUD_REGISTRATION_MODE` controls registration: `invite` (default) requires an invitation, `open` allows anyone to register after first-run setup, and `closed` forbids new registrations. Unknown values fail Server startup. The first-run administrator setup remains available in every mode.
+- `GET /api/v1/auth/registration` returns `mode` (`INVITE`, `OPEN` or `CLOSED`) to anonymous clients, so the Web app decides whether to offer registration without trying it.
+- `POST /api/v1/auth/register` accepts JSON `username`, `password` and optional `email`. In `open` mode it creates a `USER` with unlimited quota and returns `201` without authenticating or changing an existing session. Send a CSRF token from `GET /api/v1/auth/csrf`. In `closed` mode it returns `403` with type `urn:clud:problem:registration-closed` before the body is read. Otherwise invalid details return `400`; registration without an invitation in `invite` returns `403` with type `urn:clud:problem:invitation-required`; incomplete setup and a case-insensitive username conflict return `409`. A CSRF failure is also `403` but without these types, so clients retry only that one with a fresh token. Setup and registration serialize account creation with the same database table lock, so registration cannot claim the first account and concurrent duplicate names return `409`. Invite token creation and redemption follow in M1-08.
+- `open` mode lets anyone create any number of accounts, each with unlimited storage. Rate limiting (M1-09) must cover registration as well as login, and before `open` suits a public instance it needs a default quota for registered users (e.g. `CLUD_DEFAULT_QUOTA`), applied by registration and invite redemption but not by setup.
 - Admins create invites; an invite is a single-use token with an expiry.
 
 ### 6.2 Web: cookie sessions
@@ -162,7 +165,7 @@ A Clud instance is **multi-user**.
 - Every `GET /api/v1/auth/csrf` without a cookie stores an anonymous session row for 30 minutes, so an unauthenticated client can create many rows. Cover the endpoint with rate limiting (M1-09); if that is not enough, switch to `CookieCsrfTokenRepository`, which keeps the token out of the database.
 - `POST /api/v1/setup` is exempt from CSRF: it neither authenticates by cookie nor starts a session, and accepts only `application/json`, which a cross-site form cannot send. It stays exempt now that CSRF tokens exist: a token would protect no cookie authority and would make setup create an anonymous session first.
 - Passwords are hashed with Spring Security's `DelegatingPasswordEncoder`, configured by `PasswordEncoderFactories` in `auth`. New hashes use bcrypt and retain the `{bcrypt}` prefix in `users.password_hash`, so the algorithm can be upgraded later without a migration.
-- bcrypt rejects passwords longer than 72 bytes of UTF-8 (about 36 Cyrillic letters), so every endpoint that sets a password validates this limit and returns a validation error instead of failing. Setup and login each check it in their request records; extract a shared constraint once change password (M1-10) needs it too.
+- bcrypt rejects passwords longer than 72 bytes of UTF-8 (about 36 Cyrillic letters), so every endpoint that sets a password validates this limit and returns a validation error instead of failing. Request records mark password fields with `@BcryptPassword` in `auth`; change password (M1-10) uses it too.
 - Login attempts are rate-limited.
 
 ### 6.3 CLI and integrations: personal access tokens
@@ -210,7 +213,7 @@ Files and folders are **nodes** in one table. File contents are **stored objects
 - replacing file contents points the node to a new object;
 - file versions can be added later without changing the tree.
 
-Each user has one root folder node, created at registration.
+Each user has one root folder node, created at registration. Accounts are created by setup and by registration (and invite redemption), so `users` publishes an account-created event that `files` handles; `users` must not depend on `files`.
 
 ### 8.2 Tables (sketch)
 

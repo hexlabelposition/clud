@@ -54,6 +54,27 @@ func (e MeResponseRole) Valid() bool {
 	}
 }
 
+// Defines values for RegistrationStatusMode.
+const (
+	RegistrationStatusModeCLOSED RegistrationStatusMode = "CLOSED"
+	RegistrationStatusModeINVITE RegistrationStatusMode = "INVITE"
+	RegistrationStatusModeOPEN   RegistrationStatusMode = "OPEN"
+)
+
+// Valid indicates whether the value is a known member of the RegistrationStatusMode enum.
+func (e RegistrationStatusMode) Valid() bool {
+	switch e {
+	case RegistrationStatusModeCLOSED:
+		return true
+	case RegistrationStatusModeINVITE:
+		return true
+	case RegistrationStatusModeOPEN:
+		return true
+	default:
+		return false
+	}
+}
+
 // CsrfResponse defines model for CsrfResponse.
 type CsrfResponse struct {
 	HeaderName string `json:"headerName"`
@@ -100,6 +121,23 @@ type ProblemDetail struct {
 	AdditionalProperties map[string]interface{} `json:"-"`
 }
 
+// RegistrationRequest defines model for RegistrationRequest.
+type RegistrationRequest struct {
+	Email *openapi_types.Email `json:"email,omitempty"`
+
+	// Password Non-blank password, at most 72 bytes of UTF-8
+	Password string `json:"password"`
+	Username string `json:"username"`
+}
+
+// RegistrationStatus defines model for RegistrationStatus.
+type RegistrationStatus struct {
+	Mode RegistrationStatusMode `json:"mode"`
+}
+
+// RegistrationStatusMode defines model for RegistrationStatus.Mode.
+type RegistrationStatusMode string
+
 // SetupRequest defines model for SetupRequest.
 type SetupRequest struct {
 	Email *openapi_types.Email `json:"email,omitempty"`
@@ -126,8 +164,17 @@ type LogoutParams struct {
 	XCSRFTOKEN string `json:"X-CSRF-TOKEN"`
 }
 
+// RegisterParams defines parameters for Register.
+type RegisterParams struct {
+	// XCSRFTOKEN Token from GET /api/v1/auth/csrf
+	XCSRFTOKEN string `json:"X-CSRF-TOKEN"`
+}
+
 // LoginJSONRequestBody defines body for Login for application/json ContentType.
 type LoginJSONRequestBody = LoginRequest
+
+// RegisterJSONRequestBody defines body for Register for application/json ContentType.
+type RegisterJSONRequestBody = RegistrationRequest
 
 // SetupJSONRequestBody defines body for Setup for application/json ContentType.
 type SetupJSONRequestBody = SetupRequest
@@ -350,6 +397,23 @@ type ClientInterface interface {
 	// Logout performs a POST /api/v1/auth/logout (the `Logout` operationId) request.
 	Logout(ctx context.Context, params *LogoutParams, reqEditors ...RequestEditorFn) (*http.Response, error)
 
+	// RegisterWithBody performs a POST /api/v1/auth/register (the `Register` operationId) request,
+	// with any type of body and a specified content type.
+	//
+	// Creates a USER account in open registration mode after first-run setup. Does not start a session. Registration without an invitation is forbidden in invite and closed modes.
+	RegisterWithBody(ctx context.Context, params *RegisterParams, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*http.Response, error)
+
+	// Register performs a POST /api/v1/auth/register (the `Register` operationId) request.
+	// Takes a body of the `application/json` content type.
+	//
+	// Creates a USER account in open registration mode after first-run setup. Does not start a session. Registration without an invitation is forbidden in invite and closed modes.
+	Register(ctx context.Context, params *RegisterParams, body RegisterJSONRequestBody, reqEditors ...RequestEditorFn) (*http.Response, error)
+
+	// RegistrationStatus performs a GET /api/v1/auth/registration (the `RegistrationStatus` operationId) request.
+	//
+	// Reports the registration mode so clients can decide whether to offer registration.
+	RegistrationStatus(ctx context.Context, reqEditors ...RequestEditorFn) (*http.Response, error)
+
 	// Health performs a GET /api/v1/health (the `Health` operationId) request.
 	Health(ctx context.Context, reqEditors ...RequestEditorFn) (*http.Response, error)
 
@@ -416,6 +480,53 @@ func (c *Client) Login(ctx context.Context, params *LoginParams, body LoginJSONR
 // Logout performs a POST /api/v1/auth/logout (the `Logout` operationId) request.
 func (c *Client) Logout(ctx context.Context, params *LogoutParams, reqEditors ...RequestEditorFn) (*http.Response, error) {
 	req, err := NewLogoutRequest(c.Server, params)
+	if err != nil {
+		return nil, err
+	}
+	req = req.WithContext(ctx)
+	if err := c.applyEditors(ctx, req, reqEditors); err != nil {
+		return nil, err
+	}
+	return c.Client.Do(req)
+}
+
+// RegisterWithBody performs a POST /api/v1/auth/register (the `Register` operationId) request,
+// with any type of body and a specified content type.
+//
+// Creates a USER account in open registration mode after first-run setup. Does not start a session. Registration without an invitation is forbidden in invite and closed modes.
+func (c *Client) RegisterWithBody(ctx context.Context, params *RegisterParams, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*http.Response, error) {
+	req, err := NewRegisterRequestWithBody(c.Server, params, contentType, body)
+	if err != nil {
+		return nil, err
+	}
+	req = req.WithContext(ctx)
+	if err := c.applyEditors(ctx, req, reqEditors); err != nil {
+		return nil, err
+	}
+	return c.Client.Do(req)
+}
+
+// Register performs a POST /api/v1/auth/register (the `Register` operationId) request.
+// Takes a body of the `application/json` content type.
+//
+// Creates a USER account in open registration mode after first-run setup. Does not start a session. Registration without an invitation is forbidden in invite and closed modes.
+func (c *Client) Register(ctx context.Context, params *RegisterParams, body RegisterJSONRequestBody, reqEditors ...RequestEditorFn) (*http.Response, error) {
+	req, err := NewRegisterRequest(c.Server, params, body)
+	if err != nil {
+		return nil, err
+	}
+	req = req.WithContext(ctx)
+	if err := c.applyEditors(ctx, req, reqEditors); err != nil {
+		return nil, err
+	}
+	return c.Client.Do(req)
+}
+
+// RegistrationStatus performs a GET /api/v1/auth/registration (the `RegistrationStatus` operationId) request.
+//
+// Reports the registration mode so clients can decide whether to offer registration.
+func (c *Client) RegistrationStatus(ctx context.Context, reqEditors ...RequestEditorFn) (*http.Response, error) {
+	req, err := NewRegistrationStatusRequest(c.Server)
 	if err != nil {
 		return nil, err
 	}
@@ -615,6 +726,86 @@ func NewLogoutRequest(server string, params *LogoutParams) (*http.Request, error
 	return req, nil
 }
 
+// NewRegisterRequest calls the generic Register builder with application/json body
+func NewRegisterRequest(server string, params *RegisterParams, body RegisterJSONRequestBody) (*http.Request, error) {
+	var bodyReader io.Reader
+	buf, err := json.Marshal(body)
+	if err != nil {
+		return nil, err
+	}
+	bodyReader = bytes.NewReader(buf)
+	return NewRegisterRequestWithBody(server, params, "application/json", bodyReader)
+}
+
+// NewRegisterRequestWithBody constructs an http.Request for the Register method, with any body, and a specified content type
+func NewRegisterRequestWithBody(server string, params *RegisterParams, contentType string, body io.Reader) (*http.Request, error) {
+	var err error
+
+	serverURL, err := url.Parse(server)
+	if err != nil {
+		return nil, err
+	}
+
+	operationPath := fmt.Sprintf("/api/v1/auth/register")
+	if operationPath[0] == '/' {
+		operationPath = "." + operationPath
+	}
+
+	queryURL, err := serverURL.Parse(operationPath)
+	if err != nil {
+		return nil, err
+	}
+
+	req, err := http.NewRequest(http.MethodPost, queryURL.String(), body)
+	if err != nil {
+		return nil, err
+	}
+
+	req.Header.Add("Content-Type", contentType)
+
+	if params != nil {
+
+		var headerParam0 string
+
+		headerParam0, err = runtime.StyleParamWithOptions("simple", false, "X-CSRF-TOKEN", params.XCSRFTOKEN, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationHeader, Type: "string", Format: ""})
+		if err != nil {
+			return nil, err
+		}
+
+		req.Header.Set("X-CSRF-TOKEN", headerParam0)
+
+	}
+
+	return req, nil
+}
+
+// NewRegistrationStatusRequest constructs an http.Request for the RegistrationStatus method
+func NewRegistrationStatusRequest(server string) (*http.Request, error) {
+	var err error
+
+	serverURL, err := url.Parse(server)
+	if err != nil {
+		return nil, err
+	}
+
+	operationPath := fmt.Sprintf("/api/v1/auth/registration")
+	if operationPath[0] == '/' {
+		operationPath = "." + operationPath
+	}
+
+	queryURL, err := serverURL.Parse(operationPath)
+	if err != nil {
+		return nil, err
+	}
+
+	req, err := http.NewRequest(http.MethodGet, queryURL.String(), nil)
+	if err != nil {
+		return nil, err
+	}
+
+	return req, nil
+}
+
 // NewHealthRequest constructs an http.Request for the Health method
 func NewHealthRequest(server string) (*http.Request, error) {
 	var err error
@@ -802,6 +993,27 @@ type ClientWithResponsesInterface interface {
 	// Returns a wrapper object for the known response body format(s).
 	LogoutWithResponse(ctx context.Context, params *LogoutParams, reqEditors ...RequestEditorFn) (*LogoutResponse, error)
 
+	// RegisterWithBodyWithResponse performs a POST /api/v1/auth/register (the `Register` operationId) request,
+	// with any type of body and a specified content type.
+	//
+	// Creates a USER account in open registration mode after first-run setup. Does not start a session. Registration without an invitation is forbidden in invite and closed modes.
+	//
+	// Returns a wrapper object for the known response body format(s).
+	RegisterWithBodyWithResponse(ctx context.Context, params *RegisterParams, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*RegisterResponse, error)
+
+	// RegisterWithResponse performs a POST /api/v1/auth/register (the `Register` operationId) request.
+	// Takes a body of the `application/json` content type, and returns a wrapper object for the known response body format(s).
+	//
+	// Creates a USER account in open registration mode after first-run setup. Does not start a session. Registration without an invitation is forbidden in invite and closed modes.
+	RegisterWithResponse(ctx context.Context, params *RegisterParams, body RegisterJSONRequestBody, reqEditors ...RequestEditorFn) (*RegisterResponse, error)
+
+	// RegistrationStatusWithResponse performs a GET /api/v1/auth/registration (the `RegistrationStatus` operationId) request.
+	//
+	// Reports the registration mode so clients can decide whether to offer registration.
+	//
+	// Returns a wrapper object for the known response body format(s).
+	RegistrationStatusWithResponse(ctx context.Context, reqEditors ...RequestEditorFn) (*RegistrationStatusResponse, error)
+
 	// HealthWithResponse performs a GET /api/v1/health (the `Health` operationId) request.
 	//
 	// Returns a wrapper object for the known response body format(s).
@@ -968,6 +1180,102 @@ func (r LogoutResponse) StatusCode() int {
 
 // ContentType is a convenience method to retrieve the Content-Type value from the HTTP response headers
 func (r LogoutResponse) ContentType() string {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.Header.Get("Content-Type")
+	}
+	return ""
+}
+
+type RegisterResponse struct {
+	Body         []byte
+	HTTPResponse *http.Response
+	// ApplicationproblemJSON400 the response for an HTTP 400 `application/problem+json` response
+	ApplicationproblemJSON400 *ProblemDetail
+	// ApplicationproblemJSON403 the response for an HTTP 403 `application/problem+json` response
+	ApplicationproblemJSON403 *ProblemDetail
+	// ApplicationproblemJSON409 the response for an HTTP 409 `application/problem+json` response
+	ApplicationproblemJSON409 *ProblemDetail
+}
+
+// GetApplicationproblemJSON400 returns the response for an HTTP 400 `application/problem+json` response
+func (r RegisterResponse) GetApplicationproblemJSON400() *ProblemDetail {
+	return r.ApplicationproblemJSON400
+}
+
+// GetApplicationproblemJSON403 returns the response for an HTTP 403 `application/problem+json` response
+func (r RegisterResponse) GetApplicationproblemJSON403() *ProblemDetail {
+	return r.ApplicationproblemJSON403
+}
+
+// GetApplicationproblemJSON409 returns the response for an HTTP 409 `application/problem+json` response
+func (r RegisterResponse) GetApplicationproblemJSON409() *ProblemDetail {
+	return r.ApplicationproblemJSON409
+}
+
+// GetBody returns the raw response body bytes
+func (r RegisterResponse) GetBody() []byte {
+	return r.Body
+}
+
+// Status returns HTTPResponse.Status
+func (r RegisterResponse) Status() string {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.Status
+	}
+	return http.StatusText(0)
+}
+
+// StatusCode returns HTTPResponse.StatusCode
+func (r RegisterResponse) StatusCode() int {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.StatusCode
+	}
+	return 0
+}
+
+// ContentType is a convenience method to retrieve the Content-Type value from the HTTP response headers
+func (r RegisterResponse) ContentType() string {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.Header.Get("Content-Type")
+	}
+	return ""
+}
+
+type RegistrationStatusResponse struct {
+	Body         []byte
+	HTTPResponse *http.Response
+	// JSON200 the response for an HTTP 200 `application/json` response
+	JSON200 *RegistrationStatus
+}
+
+// GetJSON200 returns the response for an HTTP 200 `application/json` response
+func (r RegistrationStatusResponse) GetJSON200() *RegistrationStatus {
+	return r.JSON200
+}
+
+// GetBody returns the raw response body bytes
+func (r RegistrationStatusResponse) GetBody() []byte {
+	return r.Body
+}
+
+// Status returns HTTPResponse.Status
+func (r RegistrationStatusResponse) Status() string {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.Status
+	}
+	return http.StatusText(0)
+}
+
+// StatusCode returns HTTPResponse.StatusCode
+func (r RegistrationStatusResponse) StatusCode() int {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.StatusCode
+	}
+	return 0
+}
+
+// ContentType is a convenience method to retrieve the Content-Type value from the HTTP response headers
+func (r RegistrationStatusResponse) ContentType() string {
 	if r.HTTPResponse != nil {
 		return r.HTTPResponse.Header.Get("Content-Type")
 	}
@@ -1205,6 +1513,45 @@ func (c *ClientWithResponses) LogoutWithResponse(ctx context.Context, params *Lo
 	return ParseLogoutResponse(rsp)
 }
 
+// RegisterWithBodyWithResponse performs a POST /api/v1/auth/register (the `Register` operationId) request,
+// with any type of body and a specified content type.
+//
+// Creates a USER account in open registration mode after first-run setup. Does not start a session. Registration without an invitation is forbidden in invite and closed modes.
+//
+// Returns a wrapper object for the known response body format(s).
+func (c *ClientWithResponses) RegisterWithBodyWithResponse(ctx context.Context, params *RegisterParams, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*RegisterResponse, error) {
+	rsp, err := c.RegisterWithBody(ctx, params, contentType, body, reqEditors...)
+	if err != nil {
+		return nil, err
+	}
+	return ParseRegisterResponse(rsp)
+}
+
+// RegisterWithResponse performs a POST /api/v1/auth/register (the `Register` operationId) request.
+// Takes a body of the `application/json` content type, and returns a wrapper object for the known response body format(s).
+//
+// Creates a USER account in open registration mode after first-run setup. Does not start a session. Registration without an invitation is forbidden in invite and closed modes.
+func (c *ClientWithResponses) RegisterWithResponse(ctx context.Context, params *RegisterParams, body RegisterJSONRequestBody, reqEditors ...RequestEditorFn) (*RegisterResponse, error) {
+	rsp, err := c.Register(ctx, params, body, reqEditors...)
+	if err != nil {
+		return nil, err
+	}
+	return ParseRegisterResponse(rsp)
+}
+
+// RegistrationStatusWithResponse performs a GET /api/v1/auth/registration (the `RegistrationStatus` operationId) request.
+//
+// Reports the registration mode so clients can decide whether to offer registration.
+//
+// Returns a wrapper object for the known response body format(s).
+func (c *ClientWithResponses) RegistrationStatusWithResponse(ctx context.Context, reqEditors ...RequestEditorFn) (*RegistrationStatusResponse, error) {
+	rsp, err := c.RegistrationStatus(ctx, reqEditors...)
+	if err != nil {
+		return nil, err
+	}
+	return ParseRegistrationStatusResponse(rsp)
+}
+
 // HealthWithResponse performs a GET /api/v1/health (the `Health` operationId) request.
 //
 // Returns a wrapper object for the known response body format(s).
@@ -1367,6 +1714,75 @@ func ParseLogoutResponse(rsp *http.Response) (*LogoutResponse, error) {
 			return nil, err
 		}
 		response.ApplicationproblemJSON403 = &dest
+
+	}
+
+	return response, nil
+}
+
+// ParseRegisterResponse parses an HTTP response from a RegisterWithResponse call
+func ParseRegisterResponse(rsp *http.Response) (*RegisterResponse, error) {
+	bodyBytes, err := io.ReadAll(rsp.Body)
+	defer func() { _ = rsp.Body.Close() }()
+	if err != nil {
+		return nil, err
+	}
+
+	response := &RegisterResponse{
+		Body:         bodyBytes,
+		HTTPResponse: rsp,
+	}
+
+	switch {
+	case rsp.StatusCode == 201:
+		break // No content-type
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 400:
+		var dest ProblemDetail
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.ApplicationproblemJSON400 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 403:
+		var dest ProblemDetail
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.ApplicationproblemJSON403 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 409:
+		var dest ProblemDetail
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.ApplicationproblemJSON409 = &dest
+
+	}
+
+	return response, nil
+}
+
+// ParseRegistrationStatusResponse parses an HTTP response from a RegistrationStatusWithResponse call
+func ParseRegistrationStatusResponse(rsp *http.Response) (*RegistrationStatusResponse, error) {
+	bodyBytes, err := io.ReadAll(rsp.Body)
+	defer func() { _ = rsp.Body.Close() }()
+	if err != nil {
+		return nil, err
+	}
+
+	response := &RegistrationStatusResponse{
+		Body:         bodyBytes,
+		HTTPResponse: rsp,
+	}
+
+	switch {
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 200:
+		var dest RegistrationStatus
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON200 = &dest
 
 	}
 

@@ -1,7 +1,5 @@
 package dev.clud.server.auth.internal;
 
-import java.nio.charset.StandardCharsets;
-
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ProblemDetail;
 import org.springframework.security.authentication.AuthenticationManager;
@@ -30,7 +28,6 @@ import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
 import jakarta.validation.Valid;
-import jakarta.validation.constraints.AssertTrue;
 import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.Pattern;
 import jakarta.validation.constraints.Size;
@@ -102,14 +99,7 @@ class SessionController {
 
 	record LoginRequest(
 			@NotBlank @Size(min = 1, max = 64) @Pattern(regexp = "[A-Za-z0-9._-]+") String username,
-			@NotBlank @Size(min = 1, max = 72) @Schema(format = "password", description = "At most 72 bytes of UTF-8") String password) {
-
-		@AssertTrue(message = "Password must not exceed 72 bytes of UTF-8")
-		@Schema(hidden = true)
-		public boolean isPasswordWithinByteLimit() {
-			return password == null || password.getBytes(StandardCharsets.UTF_8).length <= 72;
-		}
-
+			@NotBlank @Size(min = 1, max = 72) @BcryptPassword @Schema(format = "password", description = "At most 72 bytes of UTF-8") String password) {
 	}
 
 }
