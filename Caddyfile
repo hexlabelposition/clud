@@ -2,7 +2,10 @@
 # certificate automatically, http:// serves plain HTTP (LAN, behind a tunnel).
 {$CLUD_PUBLIC_URL} {
 	handle /api/* {
-		reverse_proxy {$SERVER_UPSTREAM:server:8080}
+		reverse_proxy {$SERVER_UPSTREAM:server:8080} {
+			# The Server accepts this single address only from trusted proxy peers.
+			header_up X-Forwarded-For {remote_host}
+		}
 	}
 	handle {
 		reverse_proxy {$WEB_UPSTREAM:web:3000}

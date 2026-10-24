@@ -61,7 +61,7 @@ Goal: a multi-user instance with an admin and invite-based registration.
 - [x] **M1-06** `GET /api/v1/me`
 - [x] **M1-07** Registration modes `invite` / `open` / `closed` (`CLUD_REGISTRATION_MODE`)
 - [x] **M1-08** Invites: admin creates an invite via API; registration with invite token; expiry and single use
-- [ ] **M1-09** Login and registration rate limiting
+- [x] **M1-09** Login and registration rate limiting
 - [ ] **M1-10** Change password
 - [ ] **M1-11** Web: first-run setup, login, register with invite, change password, route guard
 - [ ] **M1-12** Tests: auth flows, CSRF, registration modes

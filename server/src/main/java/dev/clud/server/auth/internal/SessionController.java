@@ -56,6 +56,11 @@ class SessionController {
 	@GetMapping("/csrf")
 	@Operation(description = "Returns a CSRF token and its header name, creating an anonymous session if needed. "
 			+ "Keep the SESSION cookie and send the token on login and logout. Fetch a fresh token after either operation.")
+	@ApiResponse(responseCode = "200", description = "CSRF token",
+			content = @Content(mediaType = "application/json", schema = @Schema(implementation = CsrfResponse.class)))
+	@ApiResponse(responseCode = "429", description = "Client IP rate limit exceeded; retry after the indicated seconds",
+			headers = @Header(name = "Retry-After", schema = @Schema(type = "integer", format = "int64", minimum = "1")),
+			content = @Content(mediaType = "application/problem+json", schema = @Schema(implementation = ProblemDetail.class)))
 	CsrfResponse csrfToken(@Parameter(hidden = true) CsrfToken token) {
 		return new CsrfResponse(token.getHeaderName(), token.getToken());
 	}
@@ -71,6 +76,9 @@ class SessionController {
 	@ApiResponse(responseCode = "401", description = "Invalid credentials or disabled account",
 			content = @Content(mediaType = "application/problem+json", schema = @Schema(implementation = ProblemDetail.class)))
 	@ApiResponse(responseCode = "403", description = "Missing or invalid CSRF token",
+			content = @Content(mediaType = "application/problem+json", schema = @Schema(implementation = ProblemDetail.class)))
+	@ApiResponse(responseCode = "429", description = "Client IP rate limit exceeded; retry after the indicated seconds",
+			headers = @Header(name = "Retry-After", schema = @Schema(type = "integer", format = "int64", minimum = "1")),
 			content = @Content(mediaType = "application/problem+json", schema = @Schema(implementation = ProblemDetail.class)))
 	void login(@Valid @RequestBody LoginRequest body, HttpServletRequest request, HttpServletResponse response) {
 		var authentication = authenticationManager.authenticate(

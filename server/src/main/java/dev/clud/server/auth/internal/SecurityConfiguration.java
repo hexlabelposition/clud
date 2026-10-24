@@ -7,6 +7,7 @@ import org.springframework.security.config.annotation.web.builders.HttpSecurity;
 import org.springframework.security.web.SecurityFilterChain;
 import org.springframework.security.web.context.SecurityContextRepository;
 import org.springframework.security.web.csrf.CsrfTokenRepository;
+import org.springframework.security.web.csrf.CsrfFilter;
 import org.springframework.security.web.savedrequest.NullRequestCache;
 import org.springframework.web.servlet.HandlerExceptionResolver;
 
@@ -16,8 +17,10 @@ class SecurityConfiguration {
 	@Bean
 	SecurityFilterChain securityFilterChain(HttpSecurity http,
 			@Qualifier("handlerExceptionResolver") HandlerExceptionResolver exceptionResolver,
-			SecurityContextRepository contexts, CsrfTokenRepository csrfTokens) {
+			SecurityContextRepository contexts, CsrfTokenRepository csrfTokens,
+			AuthRateLimiter limiter, ClientAddressResolver addresses) {
 		return http
+				.addFilterBefore(new AuthRateLimitFilter(limiter, addresses, exceptionResolver), CsrfFilter.class)
 				.securityContext(context -> context.securityContextRepository(contexts))
 				// JSON clients handle navigation themselves; do not create a session
 				// just to remember an unauthorized request or expose form logout.

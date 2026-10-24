@@ -18,6 +18,7 @@ import dev.clud.server.common.RegistrationMode;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.Parameter;
 import io.swagger.v3.oas.annotations.enums.ParameterIn;
+import io.swagger.v3.oas.annotations.headers.Header;
 import io.swagger.v3.oas.annotations.media.Content;
 import io.swagger.v3.oas.annotations.media.Schema;
 import io.swagger.v3.oas.annotations.media.Schema.RequiredMode;
@@ -69,6 +70,9 @@ class RegistrationController {
 			+ InvitesService.INVALID_INVITATION + "), or missing or invalid CSRF token",
 			content = @Content(mediaType = "application/problem+json", schema = @Schema(implementation = ProblemDetail.class)))
 	@ApiResponse(responseCode = "409", description = "First-run setup required or username already taken",
+			content = @Content(mediaType = "application/problem+json", schema = @Schema(implementation = ProblemDetail.class)))
+	@ApiResponse(responseCode = "429", description = "Client IP rate limit exceeded; retry after the indicated seconds",
+			headers = @Header(name = "Retry-After", schema = @Schema(type = "integer", format = "int64", minimum = "1")),
 			content = @Content(mediaType = "application/problem+json", schema = @Schema(implementation = ProblemDetail.class)))
 	void register(@Valid @RequestBody RegistrationRequest request) {
 		// RegistrationConfiguration rejects closed mode before the body is read; check

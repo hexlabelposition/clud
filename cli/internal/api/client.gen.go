@@ -1242,16 +1242,30 @@ func (r CreateInviteResponse) ContentType() string {
 	return ""
 }
 
+// CsrfTokenResponse429Headers the declared response headers of an HTTP 429 response for CsrfToken
+type CsrfTokenResponse429Headers struct {
+	RetryAfter *int64
+}
+
 type CsrfTokenResponse struct {
 	Body         []byte
 	HTTPResponse *http.Response
 	// JSON200 the response for an HTTP 200 `application/json` response
 	JSON200 *CsrfResponse
+	// ApplicationproblemJSON429 the response for an HTTP 429 `application/problem+json` response
+	ApplicationproblemJSON429 *ProblemDetail
+	// Headers429 the parsed response headers for an HTTP 429 response
+	Headers429 *CsrfTokenResponse429Headers
 }
 
 // GetJSON200 returns the response for an HTTP 200 `application/json` response
 func (r CsrfTokenResponse) GetJSON200() *CsrfResponse {
 	return r.JSON200
+}
+
+// GetApplicationproblemJSON429 returns the response for an HTTP 429 `application/problem+json` response
+func (r CsrfTokenResponse) GetApplicationproblemJSON429() *ProblemDetail {
+	return r.ApplicationproblemJSON429
 }
 
 // GetBody returns the raw response body bytes
@@ -1288,6 +1302,11 @@ type LoginResponse204Headers struct {
 	SetCookie *string
 }
 
+// LoginResponse429Headers the declared response headers of an HTTP 429 response for Login
+type LoginResponse429Headers struct {
+	RetryAfter *int64
+}
+
 type LoginResponse struct {
 	Body         []byte
 	HTTPResponse *http.Response
@@ -1297,8 +1316,12 @@ type LoginResponse struct {
 	ApplicationproblemJSON401 *ProblemDetail
 	// ApplicationproblemJSON403 the response for an HTTP 403 `application/problem+json` response
 	ApplicationproblemJSON403 *ProblemDetail
+	// ApplicationproblemJSON429 the response for an HTTP 429 `application/problem+json` response
+	ApplicationproblemJSON429 *ProblemDetail
 	// Headers204 the parsed response headers for an HTTP 204 response
 	Headers204 *LoginResponse204Headers
+	// Headers429 the parsed response headers for an HTTP 429 response
+	Headers429 *LoginResponse429Headers
 }
 
 // GetApplicationproblemJSON400 returns the response for an HTTP 400 `application/problem+json` response
@@ -1314,6 +1337,11 @@ func (r LoginResponse) GetApplicationproblemJSON401() *ProblemDetail {
 // GetApplicationproblemJSON403 returns the response for an HTTP 403 `application/problem+json` response
 func (r LoginResponse) GetApplicationproblemJSON403() *ProblemDetail {
 	return r.ApplicationproblemJSON403
+}
+
+// GetApplicationproblemJSON429 returns the response for an HTTP 429 `application/problem+json` response
+func (r LoginResponse) GetApplicationproblemJSON429() *ProblemDetail {
+	return r.ApplicationproblemJSON429
 }
 
 // GetBody returns the raw response body bytes
@@ -1386,6 +1414,11 @@ func (r LogoutResponse) ContentType() string {
 	return ""
 }
 
+// RegisterResponse429Headers the declared response headers of an HTTP 429 response for Register
+type RegisterResponse429Headers struct {
+	RetryAfter *int64
+}
+
 type RegisterResponse struct {
 	Body         []byte
 	HTTPResponse *http.Response
@@ -1395,6 +1428,10 @@ type RegisterResponse struct {
 	ApplicationproblemJSON403 *ProblemDetail
 	// ApplicationproblemJSON409 the response for an HTTP 409 `application/problem+json` response
 	ApplicationproblemJSON409 *ProblemDetail
+	// ApplicationproblemJSON429 the response for an HTTP 429 `application/problem+json` response
+	ApplicationproblemJSON429 *ProblemDetail
+	// Headers429 the parsed response headers for an HTTP 429 response
+	Headers429 *RegisterResponse429Headers
 }
 
 // GetApplicationproblemJSON400 returns the response for an HTTP 400 `application/problem+json` response
@@ -1410,6 +1447,11 @@ func (r RegisterResponse) GetApplicationproblemJSON403() *ProblemDetail {
 // GetApplicationproblemJSON409 returns the response for an HTTP 409 `application/problem+json` response
 func (r RegisterResponse) GetApplicationproblemJSON409() *ProblemDetail {
 	return r.ApplicationproblemJSON409
+}
+
+// GetApplicationproblemJSON429 returns the response for an HTTP 429 `application/problem+json` response
+func (r RegisterResponse) GetApplicationproblemJSON429() *ProblemDetail {
+	return r.ApplicationproblemJSON429
 }
 
 // GetBody returns the raw response body bytes
@@ -1903,6 +1945,26 @@ func ParseCsrfTokenResponse(rsp *http.Response) (*CsrfTokenResponse, error) {
 		}
 		response.JSON200 = &dest
 
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 429:
+		var dest ProblemDetail
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.ApplicationproblemJSON429 = &dest
+
+	}
+
+	switch {
+	case rsp.StatusCode == 429:
+		var headers CsrfTokenResponse429Headers
+		if values := rsp.Header.Values("Retry-After"); len(values) > 0 {
+			var value int64
+			if err := runtime.BindStyledParameterWithOptions("simple", "Retry-After", values[0], &value, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationHeader, Explode: false, Required: false, Type: "integer", Format: "int64"}); err != nil {
+				return nil, err
+			}
+			headers.RetryAfter = &value
+		}
+		response.Headers429 = &headers
 	}
 
 	return response, nil
@@ -1946,6 +2008,13 @@ func ParseLoginResponse(rsp *http.Response) (*LoginResponse, error) {
 		}
 		response.ApplicationproblemJSON403 = &dest
 
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 429:
+		var dest ProblemDetail
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.ApplicationproblemJSON429 = &dest
+
 	}
 
 	switch {
@@ -1959,6 +2028,16 @@ func ParseLoginResponse(rsp *http.Response) (*LoginResponse, error) {
 			headers.SetCookie = &value
 		}
 		response.Headers204 = &headers
+	case rsp.StatusCode == 429:
+		var headers LoginResponse429Headers
+		if values := rsp.Header.Values("Retry-After"); len(values) > 0 {
+			var value int64
+			if err := runtime.BindStyledParameterWithOptions("simple", "Retry-After", values[0], &value, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationHeader, Explode: false, Required: false, Type: "integer", Format: "int64"}); err != nil {
+				return nil, err
+			}
+			headers.RetryAfter = &value
+		}
+		response.Headers429 = &headers
 	}
 
 	return response, nil
@@ -2031,6 +2110,26 @@ func ParseRegisterResponse(rsp *http.Response) (*RegisterResponse, error) {
 		}
 		response.ApplicationproblemJSON409 = &dest
 
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 429:
+		var dest ProblemDetail
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.ApplicationproblemJSON429 = &dest
+
+	}
+
+	switch {
+	case rsp.StatusCode == 429:
+		var headers RegisterResponse429Headers
+		if values := rsp.Header.Values("Retry-After"); len(values) > 0 {
+			var value int64
+			if err := runtime.BindStyledParameterWithOptions("simple", "Retry-After", values[0], &value, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationHeader, Explode: false, Required: false, Type: "integer", Format: "int64"}); err != nil {
+				return nil, err
+			}
+			headers.RetryAfter = &value
+		}
+		response.Headers429 = &headers
 	}
 
 	return response, nil
