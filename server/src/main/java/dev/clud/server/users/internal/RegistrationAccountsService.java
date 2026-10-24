@@ -26,13 +26,13 @@ class RegistrationAccountsService implements RegistrationAccounts {
 		// competing registrations must check username uniqueness atomically.
 		jdbc.execute("LOCK TABLE users IN SHARE ROW EXCLUSIVE MODE");
 		if (users.count() == 0) {
-			return Result.SETUP_REQUIRED;
+			return new Result(Status.SETUP_REQUIRED, null);
 		}
 		if (users.findByUsernameIgnoreCase(username).isPresent()) {
-			return Result.USERNAME_TAKEN;
+			return new Result(Status.USERNAME_TAKEN, null);
 		}
-		users.saveAndFlush(new User(username, email, passwordHash, Role.USER, null));
-		return Result.CREATED;
+		var user = users.saveAndFlush(new User(username, email, passwordHash, Role.USER, null));
+		return new Result(Status.CREATED, user.getId());
 	}
 
 }

@@ -4,7 +4,6 @@ import java.net.URI;
 
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ProblemDetail;
-import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.web.ErrorResponseException;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PostMapping;
@@ -16,7 +15,6 @@ import org.springframework.web.server.ResponseStatusException;
 
 import dev.clud.server.common.CludProperties;
 import dev.clud.server.common.RegistrationMode;
-import dev.clud.server.users.RegistrationAccounts;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.Parameter;
 import io.swagger.v3.oas.annotations.enums.ParameterIn;
@@ -43,14 +41,11 @@ class RegistrationController {
 
 	private final CludProperties properties;
 
-	private final RegistrationAccounts accounts;
+	private final RegistrationService registration;
 
-	private final PasswordEncoder passwords;
-
-	RegistrationController(CludProperties properties, RegistrationAccounts accounts, PasswordEncoder passwords) {
+	RegistrationController(CludProperties properties, RegistrationService registration) {
 		this.properties = properties;
-		this.accounts = accounts;
-		this.passwords = passwords;
+		this.registration = registration;
 	}
 
 	@GetMapping("/registration")
@@ -61,15 +56,17 @@ class RegistrationController {
 
 	@PostMapping(value = "/register", consumes = "application/json")
 	@ResponseStatus(HttpStatus.CREATED)
-	@Operation(description = "Creates a USER account in open registration mode after first-run setup. "
-			+ "Does not start a session. Registration without an invitation is forbidden in invite and closed modes.")
+	@Operation(description = "Creates a USER account after first-run setup without starting a session. "
+			+ "Invite mode requires inviteToken; open mode allows registration without one. "
+			+ "A supplied token is validated and consumed in either mode. Closed mode always refuses registration.")
 	@Parameter(name = "X-CSRF-TOKEN", in = ParameterIn.HEADER, required = true,
 			description = "Token from GET /api/v1/auth/csrf", schema = @Schema(type = "string"))
 	@ApiResponse(responseCode = "201", description = "Account created; log in to start a session", content = @Content)
 	@ApiResponse(responseCode = "400", description = "Invalid account details",
 			content = @Content(mediaType = "application/problem+json", schema = @Schema(implementation = ProblemDetail.class)))
 	@ApiResponse(responseCode = "403", description = "Registration closed (type " + REGISTRATION_CLOSED + "), "
-			+ "invitation required (type " + INVITATION_REQUIRED + "), or missing or invalid CSRF token",
+			+ "invitation required (type " + INVITATION_REQUIRED + "), invalid, expired or used invitation (type "
+			+ InvitesService.INVALID_INVITATION + "), or missing or invalid CSRF token",
 			content = @Content(mediaType = "application/problem+json", schema = @Schema(implementation = ProblemDetail.class)))
 	@ApiResponse(responseCode = "409", description = "First-run setup required or username already taken",
 			content = @Content(mediaType = "application/problem+json", schema = @Schema(implementation = ProblemDetail.class)))
@@ -78,10 +75,14 @@ class RegistrationController {
 		// it here too so the endpoint stays safe without the interceptor.
 		switch (properties.registrationMode()) {
 			case CLOSED -> throw registrationClosed();
-			case INVITE -> throw forbidden(INVITATION_REQUIRED, "Registration requires an invitation");
+			case INVITE -> {
+				if (request.inviteToken() == null) {
+					throw forbidden(INVITATION_REQUIRED, "Registration requires an invitation");
+				}
+			}
 			case OPEN -> { }
 		}
-		switch (accounts.createUser(request.username(), request.email(), passwords.encode(request.password()))) {
+		switch (registration.register(request.username(), request.email(), request.password(), request.inviteToken())) {
 			case CREATED -> { }
 			case SETUP_REQUIRED -> throw new ResponseStatusException(HttpStatus.CONFLICT, "First-run setup required");
 			case USERNAME_TAKEN -> throw new ResponseStatusException(HttpStatus.CONFLICT, "Username already taken");
@@ -107,7 +108,8 @@ class RegistrationController {
 			@NotNull @Size(min = 1, max = 64) @Pattern(regexp = "[A-Za-z0-9._-]+") String username,
 			@Email @Size(max = 254) String email,
 			@NotBlank @Size(min = 1, max = 72) @BcryptPassword @Schema(description = "Non-blank password, at most 72 bytes of UTF-8",
-					format = "password") String password) {
+					format = "password") String password,
+			@Size(max = 128) @Schema(description = "Single-use invitation token; required in invite mode", format = "password") String inviteToken) {
 	}
 
 }

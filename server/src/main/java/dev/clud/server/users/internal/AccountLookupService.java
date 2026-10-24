@@ -1,6 +1,7 @@
 package dev.clud.server.users.internal;
 
 import java.util.Optional;
+import java.util.UUID;
 
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -21,6 +22,13 @@ class AccountLookupService implements AccountLookup {
 	@Transactional(readOnly = true)
 	public Optional<AccountCredentials> findByUsername(String username) {
 		return users.findByUsernameIgnoreCase(username)
+				.map(user -> new AccountCredentials(user.getId(), user.getPasswordHash(), user.getRole(), user.isDisabled()));
+	}
+
+	@Override
+	@Transactional(readOnly = true)
+	public Optional<AccountCredentials> findById(UUID id) {
+		return users.findById(id)
 				.map(user -> new AccountCredentials(user.getId(), user.getPasswordHash(), user.getRole(), user.isDisabled()));
 	}
 

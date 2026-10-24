@@ -2,6 +2,8 @@ package dev.clud.server.auth.internal;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
+import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.when;
 
 import java.util.Optional;
 import java.util.UUID;
@@ -16,6 +18,7 @@ import org.springframework.security.crypto.factory.PasswordEncoderFactories;
 import org.springframework.security.crypto.password.PasswordEncoder;
 
 import dev.clud.server.users.AccountCredentials;
+import dev.clud.server.users.AccountLookup;
 import dev.clud.server.users.Role;
 
 class SessionAuthenticationConfigurationTests {
@@ -40,8 +43,14 @@ class SessionAuthenticationConfigurationTests {
 	};
 
 	private final AuthenticationManager authentication = new SessionAuthenticationConfiguration()
-			.authenticationManager(username -> Optional.of(new AccountCredentials(UUID.randomUUID(),
-					delegate.encode("password"), Role.USER, true)), passwords);
+			.authenticationManager(disabledAccounts(), passwords);
+
+	private AccountLookup disabledAccounts() {
+		var accounts = mock(AccountLookup.class);
+		when(accounts.findByUsername("alice")).thenReturn(Optional.of(new AccountCredentials(UUID.randomUUID(),
+				delegate.encode("password"), Role.USER, true)));
+		return accounts;
+	}
 
 	@Test
 	void disabledAccountIsReportedOnlyAfterPasswordCheck() {

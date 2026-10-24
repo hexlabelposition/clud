@@ -75,6 +75,12 @@ func (e RegistrationStatusMode) Valid() bool {
 	}
 }
 
+// CreateInviteRequest defines model for CreateInviteRequest.
+type CreateInviteRequest struct {
+	// ExpiresAt Future expiry, at most 90 days ahead; defaults to seven days from creation
+	ExpiresAt *time.Time `json:"expiresAt,omitempty"`
+}
+
 // CsrfResponse defines model for CsrfResponse.
 type CsrfResponse struct {
 	HeaderName string `json:"headerName"`
@@ -88,6 +94,15 @@ type Health struct {
 
 // HealthStatus defines model for Health.Status.
 type HealthStatus string
+
+// InviteResponse defines model for InviteResponse.
+type InviteResponse struct {
+	ExpiresAt time.Time          `json:"expiresAt"`
+	Id        openapi_types.UUID `json:"id"`
+
+	// Token Secret token, returned only on creation
+	Token string `json:"token"`
+}
 
 // LoginRequest defines model for LoginRequest.
 type LoginRequest struct {
@@ -125,6 +140,9 @@ type ProblemDetail struct {
 type RegistrationRequest struct {
 	Email *openapi_types.Email `json:"email,omitempty"`
 
+	// InviteToken Single-use invitation token; required in invite mode
+	InviteToken *string `json:"inviteToken,omitempty"`
+
 	// Password Non-blank password, at most 72 bytes of UTF-8
 	Password string `json:"password"`
 	Username string `json:"username"`
@@ -152,6 +170,12 @@ type SetupStatus struct {
 	SetupNeeded bool `json:"setupNeeded"`
 }
 
+// CreateInviteParams defines parameters for CreateInvite.
+type CreateInviteParams struct {
+	// XCSRFTOKEN Token from GET /api/v1/auth/csrf
+	XCSRFTOKEN string `json:"X-CSRF-TOKEN"`
+}
+
 // LoginParams defines parameters for Login.
 type LoginParams struct {
 	// XCSRFTOKEN Token from GET /api/v1/auth/csrf
@@ -169,6 +193,9 @@ type RegisterParams struct {
 	// XCSRFTOKEN Token from GET /api/v1/auth/csrf
 	XCSRFTOKEN string `json:"X-CSRF-TOKEN"`
 }
+
+// CreateInviteJSONRequestBody defines body for CreateInvite for application/json ContentType.
+type CreateInviteJSONRequestBody = CreateInviteRequest
 
 // LoginJSONRequestBody defines body for Login for application/json ContentType.
 type LoginJSONRequestBody = LoginRequest
@@ -381,6 +408,18 @@ func WithRequestEditorFn(fn RequestEditorFn) ClientOption {
 // The interface specification for the client above.
 type ClientInterface interface {
 
+	// CreateInviteWithBody performs a POST /api/v1/admin/invites (the `CreateInvite` operationId) request,
+	// with any type of body and a specified content type.
+	//
+	// Administrator creates a single-use invitation. The token is returned only here; only its SHA-256 hash is stored. Default expiry is seven days, at most 90. Closed registration refuses redemption.
+	CreateInviteWithBody(ctx context.Context, params *CreateInviteParams, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*http.Response, error)
+
+	// CreateInvite performs a POST /api/v1/admin/invites (the `CreateInvite` operationId) request.
+	// Takes a body of the `application/json` content type.
+	//
+	// Administrator creates a single-use invitation. The token is returned only here; only its SHA-256 hash is stored. Default expiry is seven days, at most 90. Closed registration refuses redemption.
+	CreateInvite(ctx context.Context, params *CreateInviteParams, body CreateInviteJSONRequestBody, reqEditors ...RequestEditorFn) (*http.Response, error)
+
 	// CsrfToken performs a GET /api/v1/auth/csrf (the `CsrfToken` operationId) request.
 	//
 	// Returns a CSRF token and its header name, creating an anonymous session if needed. Keep the SESSION cookie and send the token on login and logout. Fetch a fresh token after either operation.
@@ -400,13 +439,13 @@ type ClientInterface interface {
 	// RegisterWithBody performs a POST /api/v1/auth/register (the `Register` operationId) request,
 	// with any type of body and a specified content type.
 	//
-	// Creates a USER account in open registration mode after first-run setup. Does not start a session. Registration without an invitation is forbidden in invite and closed modes.
+	// Creates a USER account after first-run setup without starting a session. Invite mode requires inviteToken; open mode allows registration without one. A supplied token is validated and consumed in either mode. Closed mode always refuses registration.
 	RegisterWithBody(ctx context.Context, params *RegisterParams, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*http.Response, error)
 
 	// Register performs a POST /api/v1/auth/register (the `Register` operationId) request.
 	// Takes a body of the `application/json` content type.
 	//
-	// Creates a USER account in open registration mode after first-run setup. Does not start a session. Registration without an invitation is forbidden in invite and closed modes.
+	// Creates a USER account after first-run setup without starting a session. Invite mode requires inviteToken; open mode allows registration without one. A supplied token is validated and consumed in either mode. Closed mode always refuses registration.
 	Register(ctx context.Context, params *RegisterParams, body RegisterJSONRequestBody, reqEditors ...RequestEditorFn) (*http.Response, error)
 
 	// RegistrationStatus performs a GET /api/v1/auth/registration (the `RegistrationStatus` operationId) request.
@@ -432,6 +471,38 @@ type ClientInterface interface {
 	// Setup performs a POST /api/v1/setup (the `Setup` operationId) request.
 	// Takes a body of the `application/json` content type.
 	Setup(ctx context.Context, body SetupJSONRequestBody, reqEditors ...RequestEditorFn) (*http.Response, error)
+}
+
+// CreateInviteWithBody performs a POST /api/v1/admin/invites (the `CreateInvite` operationId) request,
+// with any type of body and a specified content type.
+//
+// Administrator creates a single-use invitation. The token is returned only here; only its SHA-256 hash is stored. Default expiry is seven days, at most 90. Closed registration refuses redemption.
+func (c *Client) CreateInviteWithBody(ctx context.Context, params *CreateInviteParams, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*http.Response, error) {
+	req, err := NewCreateInviteRequestWithBody(c.Server, params, contentType, body)
+	if err != nil {
+		return nil, err
+	}
+	req = req.WithContext(ctx)
+	if err := c.applyEditors(ctx, req, reqEditors); err != nil {
+		return nil, err
+	}
+	return c.Client.Do(req)
+}
+
+// CreateInvite performs a POST /api/v1/admin/invites (the `CreateInvite` operationId) request.
+// Takes a body of the `application/json` content type.
+//
+// Administrator creates a single-use invitation. The token is returned only here; only its SHA-256 hash is stored. Default expiry is seven days, at most 90. Closed registration refuses redemption.
+func (c *Client) CreateInvite(ctx context.Context, params *CreateInviteParams, body CreateInviteJSONRequestBody, reqEditors ...RequestEditorFn) (*http.Response, error) {
+	req, err := NewCreateInviteRequest(c.Server, params, body)
+	if err != nil {
+		return nil, err
+	}
+	req = req.WithContext(ctx)
+	if err := c.applyEditors(ctx, req, reqEditors); err != nil {
+		return nil, err
+	}
+	return c.Client.Do(req)
 }
 
 // CsrfToken performs a GET /api/v1/auth/csrf (the `CsrfToken` operationId) request.
@@ -493,7 +564,7 @@ func (c *Client) Logout(ctx context.Context, params *LogoutParams, reqEditors ..
 // RegisterWithBody performs a POST /api/v1/auth/register (the `Register` operationId) request,
 // with any type of body and a specified content type.
 //
-// Creates a USER account in open registration mode after first-run setup. Does not start a session. Registration without an invitation is forbidden in invite and closed modes.
+// Creates a USER account after first-run setup without starting a session. Invite mode requires inviteToken; open mode allows registration without one. A supplied token is validated and consumed in either mode. Closed mode always refuses registration.
 func (c *Client) RegisterWithBody(ctx context.Context, params *RegisterParams, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*http.Response, error) {
 	req, err := NewRegisterRequestWithBody(c.Server, params, contentType, body)
 	if err != nil {
@@ -509,7 +580,7 @@ func (c *Client) RegisterWithBody(ctx context.Context, params *RegisterParams, c
 // Register performs a POST /api/v1/auth/register (the `Register` operationId) request.
 // Takes a body of the `application/json` content type.
 //
-// Creates a USER account in open registration mode after first-run setup. Does not start a session. Registration without an invitation is forbidden in invite and closed modes.
+// Creates a USER account after first-run setup without starting a session. Invite mode requires inviteToken; open mode allows registration without one. A supplied token is validated and consumed in either mode. Closed mode always refuses registration.
 func (c *Client) Register(ctx context.Context, params *RegisterParams, body RegisterJSONRequestBody, reqEditors ...RequestEditorFn) (*http.Response, error) {
 	req, err := NewRegisterRequest(c.Server, params, body)
 	if err != nil {
@@ -604,6 +675,59 @@ func (c *Client) Setup(ctx context.Context, body SetupJSONRequestBody, reqEditor
 		return nil, err
 	}
 	return c.Client.Do(req)
+}
+
+// NewCreateInviteRequest calls the generic CreateInvite builder with application/json body
+func NewCreateInviteRequest(server string, params *CreateInviteParams, body CreateInviteJSONRequestBody) (*http.Request, error) {
+	var bodyReader io.Reader
+	buf, err := json.Marshal(body)
+	if err != nil {
+		return nil, err
+	}
+	bodyReader = bytes.NewReader(buf)
+	return NewCreateInviteRequestWithBody(server, params, "application/json", bodyReader)
+}
+
+// NewCreateInviteRequestWithBody constructs an http.Request for the CreateInvite method, with any body, and a specified content type
+func NewCreateInviteRequestWithBody(server string, params *CreateInviteParams, contentType string, body io.Reader) (*http.Request, error) {
+	var err error
+
+	serverURL, err := url.Parse(server)
+	if err != nil {
+		return nil, err
+	}
+
+	operationPath := fmt.Sprintf("/api/v1/admin/invites")
+	if operationPath[0] == '/' {
+		operationPath = "." + operationPath
+	}
+
+	queryURL, err := serverURL.Parse(operationPath)
+	if err != nil {
+		return nil, err
+	}
+
+	req, err := http.NewRequest(http.MethodPost, queryURL.String(), body)
+	if err != nil {
+		return nil, err
+	}
+
+	req.Header.Add("Content-Type", contentType)
+
+	if params != nil {
+
+		var headerParam0 string
+
+		headerParam0, err = runtime.StyleParamWithOptions("simple", false, "X-CSRF-TOKEN", params.XCSRFTOKEN, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationHeader, Type: "string", Format: ""})
+		if err != nil {
+			return nil, err
+		}
+
+		req.Header.Set("X-CSRF-TOKEN", headerParam0)
+
+	}
+
+	return req, nil
 }
 
 // NewCsrfTokenRequest constructs an http.Request for the CsrfToken method
@@ -971,6 +1095,20 @@ func WithBaseURL(baseURL string) ClientOption {
 // ClientWithResponsesInterface is the interface specification for the client with responses above.
 type ClientWithResponsesInterface interface {
 
+	// CreateInviteWithBodyWithResponse performs a POST /api/v1/admin/invites (the `CreateInvite` operationId) request,
+	// with any type of body and a specified content type.
+	//
+	// Administrator creates a single-use invitation. The token is returned only here; only its SHA-256 hash is stored. Default expiry is seven days, at most 90. Closed registration refuses redemption.
+	//
+	// Returns a wrapper object for the known response body format(s).
+	CreateInviteWithBodyWithResponse(ctx context.Context, params *CreateInviteParams, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*CreateInviteResponse, error)
+
+	// CreateInviteWithResponse performs a POST /api/v1/admin/invites (the `CreateInvite` operationId) request.
+	// Takes a body of the `application/json` content type, and returns a wrapper object for the known response body format(s).
+	//
+	// Administrator creates a single-use invitation. The token is returned only here; only its SHA-256 hash is stored. Default expiry is seven days, at most 90. Closed registration refuses redemption.
+	CreateInviteWithResponse(ctx context.Context, params *CreateInviteParams, body CreateInviteJSONRequestBody, reqEditors ...RequestEditorFn) (*CreateInviteResponse, error)
+
 	// CsrfTokenWithResponse performs a GET /api/v1/auth/csrf (the `CsrfToken` operationId) request.
 	//
 	// Returns a CSRF token and its header name, creating an anonymous session if needed. Keep the SESSION cookie and send the token on login and logout. Fetch a fresh token after either operation.
@@ -996,7 +1134,7 @@ type ClientWithResponsesInterface interface {
 	// RegisterWithBodyWithResponse performs a POST /api/v1/auth/register (the `Register` operationId) request,
 	// with any type of body and a specified content type.
 	//
-	// Creates a USER account in open registration mode after first-run setup. Does not start a session. Registration without an invitation is forbidden in invite and closed modes.
+	// Creates a USER account after first-run setup without starting a session. Invite mode requires inviteToken; open mode allows registration without one. A supplied token is validated and consumed in either mode. Closed mode always refuses registration.
 	//
 	// Returns a wrapper object for the known response body format(s).
 	RegisterWithBodyWithResponse(ctx context.Context, params *RegisterParams, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*RegisterResponse, error)
@@ -1004,7 +1142,7 @@ type ClientWithResponsesInterface interface {
 	// RegisterWithResponse performs a POST /api/v1/auth/register (the `Register` operationId) request.
 	// Takes a body of the `application/json` content type, and returns a wrapper object for the known response body format(s).
 	//
-	// Creates a USER account in open registration mode after first-run setup. Does not start a session. Registration without an invitation is forbidden in invite and closed modes.
+	// Creates a USER account after first-run setup without starting a session. Invite mode requires inviteToken; open mode allows registration without one. A supplied token is validated and consumed in either mode. Closed mode always refuses registration.
 	RegisterWithResponse(ctx context.Context, params *RegisterParams, body RegisterJSONRequestBody, reqEditors ...RequestEditorFn) (*RegisterResponse, error)
 
 	// RegistrationStatusWithResponse performs a GET /api/v1/auth/registration (the `RegistrationStatus` operationId) request.
@@ -1040,6 +1178,68 @@ type ClientWithResponsesInterface interface {
 	// SetupWithResponse performs a POST /api/v1/setup (the `Setup` operationId) request.
 	// Takes a body of the `application/json` content type, and returns a wrapper object for the known response body format(s).
 	SetupWithResponse(ctx context.Context, body SetupJSONRequestBody, reqEditors ...RequestEditorFn) (*SetupResponse, error)
+}
+
+type CreateInviteResponse struct {
+	Body         []byte
+	HTTPResponse *http.Response
+	// JSON201 the response for an HTTP 201 `application/json` response
+	JSON201 *InviteResponse
+	// ApplicationproblemJSON400 the response for an HTTP 400 `application/problem+json` response
+	ApplicationproblemJSON400 *ProblemDetail
+	// ApplicationproblemJSON401 the response for an HTTP 401 `application/problem+json` response
+	ApplicationproblemJSON401 *ProblemDetail
+	// ApplicationproblemJSON403 the response for an HTTP 403 `application/problem+json` response
+	ApplicationproblemJSON403 *ProblemDetail
+}
+
+// GetJSON201 returns the response for an HTTP 201 `application/json` response
+func (r CreateInviteResponse) GetJSON201() *InviteResponse {
+	return r.JSON201
+}
+
+// GetApplicationproblemJSON400 returns the response for an HTTP 400 `application/problem+json` response
+func (r CreateInviteResponse) GetApplicationproblemJSON400() *ProblemDetail {
+	return r.ApplicationproblemJSON400
+}
+
+// GetApplicationproblemJSON401 returns the response for an HTTP 401 `application/problem+json` response
+func (r CreateInviteResponse) GetApplicationproblemJSON401() *ProblemDetail {
+	return r.ApplicationproblemJSON401
+}
+
+// GetApplicationproblemJSON403 returns the response for an HTTP 403 `application/problem+json` response
+func (r CreateInviteResponse) GetApplicationproblemJSON403() *ProblemDetail {
+	return r.ApplicationproblemJSON403
+}
+
+// GetBody returns the raw response body bytes
+func (r CreateInviteResponse) GetBody() []byte {
+	return r.Body
+}
+
+// Status returns HTTPResponse.Status
+func (r CreateInviteResponse) Status() string {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.Status
+	}
+	return http.StatusText(0)
+}
+
+// StatusCode returns HTTPResponse.StatusCode
+func (r CreateInviteResponse) StatusCode() int {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.StatusCode
+	}
+	return 0
+}
+
+// ContentType is a convenience method to retrieve the Content-Type value from the HTTP response headers
+func (r CreateInviteResponse) ContentType() string {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.Header.Get("Content-Type")
+	}
+	return ""
 }
 
 type CsrfTokenResponse struct {
@@ -1467,6 +1667,32 @@ func (r SetupResponse) ContentType() string {
 	return ""
 }
 
+// CreateInviteWithBodyWithResponse performs a POST /api/v1/admin/invites (the `CreateInvite` operationId) request,
+// with any type of body and a specified content type.
+//
+// Administrator creates a single-use invitation. The token is returned only here; only its SHA-256 hash is stored. Default expiry is seven days, at most 90. Closed registration refuses redemption.
+//
+// Returns a wrapper object for the known response body format(s).
+func (c *ClientWithResponses) CreateInviteWithBodyWithResponse(ctx context.Context, params *CreateInviteParams, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*CreateInviteResponse, error) {
+	rsp, err := c.CreateInviteWithBody(ctx, params, contentType, body, reqEditors...)
+	if err != nil {
+		return nil, err
+	}
+	return ParseCreateInviteResponse(rsp)
+}
+
+// CreateInviteWithResponse performs a POST /api/v1/admin/invites (the `CreateInvite` operationId) request.
+// Takes a body of the `application/json` content type, and returns a wrapper object for the known response body format(s).
+//
+// Administrator creates a single-use invitation. The token is returned only here; only its SHA-256 hash is stored. Default expiry is seven days, at most 90. Closed registration refuses redemption.
+func (c *ClientWithResponses) CreateInviteWithResponse(ctx context.Context, params *CreateInviteParams, body CreateInviteJSONRequestBody, reqEditors ...RequestEditorFn) (*CreateInviteResponse, error) {
+	rsp, err := c.CreateInvite(ctx, params, body, reqEditors...)
+	if err != nil {
+		return nil, err
+	}
+	return ParseCreateInviteResponse(rsp)
+}
+
 // CsrfTokenWithResponse performs a GET /api/v1/auth/csrf (the `CsrfToken` operationId) request.
 //
 // Returns a CSRF token and its header name, creating an anonymous session if needed. Keep the SESSION cookie and send the token on login and logout. Fetch a fresh token after either operation.
@@ -1516,7 +1742,7 @@ func (c *ClientWithResponses) LogoutWithResponse(ctx context.Context, params *Lo
 // RegisterWithBodyWithResponse performs a POST /api/v1/auth/register (the `Register` operationId) request,
 // with any type of body and a specified content type.
 //
-// Creates a USER account in open registration mode after first-run setup. Does not start a session. Registration without an invitation is forbidden in invite and closed modes.
+// Creates a USER account after first-run setup without starting a session. Invite mode requires inviteToken; open mode allows registration without one. A supplied token is validated and consumed in either mode. Closed mode always refuses registration.
 //
 // Returns a wrapper object for the known response body format(s).
 func (c *ClientWithResponses) RegisterWithBodyWithResponse(ctx context.Context, params *RegisterParams, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*RegisterResponse, error) {
@@ -1530,7 +1756,7 @@ func (c *ClientWithResponses) RegisterWithBodyWithResponse(ctx context.Context, 
 // RegisterWithResponse performs a POST /api/v1/auth/register (the `Register` operationId) request.
 // Takes a body of the `application/json` content type, and returns a wrapper object for the known response body format(s).
 //
-// Creates a USER account in open registration mode after first-run setup. Does not start a session. Registration without an invitation is forbidden in invite and closed modes.
+// Creates a USER account after first-run setup without starting a session. Invite mode requires inviteToken; open mode allows registration without one. A supplied token is validated and consumed in either mode. Closed mode always refuses registration.
 func (c *ClientWithResponses) RegisterWithResponse(ctx context.Context, params *RegisterParams, body RegisterJSONRequestBody, reqEditors ...RequestEditorFn) (*RegisterResponse, error) {
 	rsp, err := c.Register(ctx, params, body, reqEditors...)
 	if err != nil {
@@ -1607,6 +1833,53 @@ func (c *ClientWithResponses) SetupWithResponse(ctx context.Context, body SetupJ
 		return nil, err
 	}
 	return ParseSetupResponse(rsp)
+}
+
+// ParseCreateInviteResponse parses an HTTP response from a CreateInviteWithResponse call
+func ParseCreateInviteResponse(rsp *http.Response) (*CreateInviteResponse, error) {
+	bodyBytes, err := io.ReadAll(rsp.Body)
+	defer func() { _ = rsp.Body.Close() }()
+	if err != nil {
+		return nil, err
+	}
+
+	response := &CreateInviteResponse{
+		Body:         bodyBytes,
+		HTTPResponse: rsp,
+	}
+
+	switch {
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 201:
+		var dest InviteResponse
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON201 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 400:
+		var dest ProblemDetail
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.ApplicationproblemJSON400 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 401:
+		var dest ProblemDetail
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.ApplicationproblemJSON401 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 403:
+		var dest ProblemDetail
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.ApplicationproblemJSON403 = &dest
+
+	}
+
+	return response, nil
 }
 
 // ParseCsrfTokenResponse parses an HTTP response from a CsrfTokenWithResponse call
