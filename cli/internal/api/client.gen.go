@@ -12,6 +12,7 @@ import (
 	"net/http"
 	"net/url"
 	"strings"
+	"time"
 
 	"github.com/oapi-codegen/runtime"
 	openapi_types "github.com/oapi-codegen/runtime/types"
@@ -29,6 +30,24 @@ func (e HealthStatus) Valid() bool {
 	case HealthStatusDOWN:
 		return true
 	case HealthStatusUP:
+		return true
+	default:
+		return false
+	}
+}
+
+// Defines values for MeResponseRole.
+const (
+	MeResponseRoleADMIN MeResponseRole = "ADMIN"
+	MeResponseRoleUSER  MeResponseRole = "USER"
+)
+
+// Valid indicates whether the value is a known member of the MeResponseRole enum.
+func (e MeResponseRole) Valid() bool {
+	switch e {
+	case MeResponseRoleADMIN:
+		return true
+	case MeResponseRoleUSER:
 		return true
 	default:
 		return false
@@ -55,6 +74,21 @@ type LoginRequest struct {
 	Password string `json:"password"`
 	Username string `json:"username"`
 }
+
+// MeResponse defines model for MeResponse.
+type MeResponse struct {
+	CreatedAt time.Time            `json:"createdAt"`
+	Email     *openapi_types.Email `json:"email"`
+	Id        openapi_types.UUID   `json:"id"`
+
+	// QuotaBytes Storage limit in bytes; null means unlimited, zero allows no storage
+	QuotaBytes *int64         `json:"quotaBytes"`
+	Role       MeResponseRole `json:"role"`
+	Username   string         `json:"username"`
+}
+
+// MeResponseRole defines model for MeResponse.Role.
+type MeResponseRole string
 
 // ProblemDetail defines model for ProblemDetail.
 type ProblemDetail struct {
@@ -319,6 +353,11 @@ type ClientInterface interface {
 	// Health performs a GET /api/v1/health (the `Health` operationId) request.
 	Health(ctx context.Context, reqEditors ...RequestEditorFn) (*http.Response, error)
 
+	// CurrentUser performs a GET /api/v1/me (the `CurrentUser` operationId) request.
+	//
+	// Returns the current user's profile from the database. Requires an authenticated session.
+	CurrentUser(ctx context.Context, reqEditors ...RequestEditorFn) (*http.Response, error)
+
 	// SetupStatus performs a GET /api/v1/setup (the `SetupStatus` operationId) request.
 	SetupStatus(ctx context.Context, reqEditors ...RequestEditorFn) (*http.Response, error)
 
@@ -390,6 +429,21 @@ func (c *Client) Logout(ctx context.Context, params *LogoutParams, reqEditors ..
 // Health performs a GET /api/v1/health (the `Health` operationId) request.
 func (c *Client) Health(ctx context.Context, reqEditors ...RequestEditorFn) (*http.Response, error) {
 	req, err := NewHealthRequest(c.Server)
+	if err != nil {
+		return nil, err
+	}
+	req = req.WithContext(ctx)
+	if err := c.applyEditors(ctx, req, reqEditors); err != nil {
+		return nil, err
+	}
+	return c.Client.Do(req)
+}
+
+// CurrentUser performs a GET /api/v1/me (the `CurrentUser` operationId) request.
+//
+// Returns the current user's profile from the database. Requires an authenticated session.
+func (c *Client) CurrentUser(ctx context.Context, reqEditors ...RequestEditorFn) (*http.Response, error) {
+	req, err := NewCurrentUserRequest(c.Server)
 	if err != nil {
 		return nil, err
 	}
@@ -588,6 +642,33 @@ func NewHealthRequest(server string) (*http.Request, error) {
 	return req, nil
 }
 
+// NewCurrentUserRequest constructs an http.Request for the CurrentUser method
+func NewCurrentUserRequest(server string) (*http.Request, error) {
+	var err error
+
+	serverURL, err := url.Parse(server)
+	if err != nil {
+		return nil, err
+	}
+
+	operationPath := fmt.Sprintf("/api/v1/me")
+	if operationPath[0] == '/' {
+		operationPath = "." + operationPath
+	}
+
+	queryURL, err := serverURL.Parse(operationPath)
+	if err != nil {
+		return nil, err
+	}
+
+	req, err := http.NewRequest(http.MethodGet, queryURL.String(), nil)
+	if err != nil {
+		return nil, err
+	}
+
+	return req, nil
+}
+
 // NewSetupStatusRequest constructs an http.Request for the SetupStatus method
 func NewSetupStatusRequest(server string) (*http.Request, error) {
 	var err error
@@ -725,6 +806,13 @@ type ClientWithResponsesInterface interface {
 	//
 	// Returns a wrapper object for the known response body format(s).
 	HealthWithResponse(ctx context.Context, reqEditors ...RequestEditorFn) (*HealthResponse, error)
+
+	// CurrentUserWithResponse performs a GET /api/v1/me (the `CurrentUser` operationId) request.
+	//
+	// Returns the current user's profile from the database. Requires an authenticated session.
+	//
+	// Returns a wrapper object for the known response body format(s).
+	CurrentUserWithResponse(ctx context.Context, reqEditors ...RequestEditorFn) (*CurrentUserResponse, error)
 
 	// SetupStatusWithResponse performs a GET /api/v1/setup (the `SetupStatus` operationId) request.
 	//
@@ -934,6 +1022,54 @@ func (r HealthResponse) ContentType() string {
 	return ""
 }
 
+type CurrentUserResponse struct {
+	Body         []byte
+	HTTPResponse *http.Response
+	// JSON200 the response for an HTTP 200 `application/json` response
+	JSON200 *MeResponse
+	// ApplicationproblemJSON401 the response for an HTTP 401 `application/problem+json` response
+	ApplicationproblemJSON401 *ProblemDetail
+}
+
+// GetJSON200 returns the response for an HTTP 200 `application/json` response
+func (r CurrentUserResponse) GetJSON200() *MeResponse {
+	return r.JSON200
+}
+
+// GetApplicationproblemJSON401 returns the response for an HTTP 401 `application/problem+json` response
+func (r CurrentUserResponse) GetApplicationproblemJSON401() *ProblemDetail {
+	return r.ApplicationproblemJSON401
+}
+
+// GetBody returns the raw response body bytes
+func (r CurrentUserResponse) GetBody() []byte {
+	return r.Body
+}
+
+// Status returns HTTPResponse.Status
+func (r CurrentUserResponse) Status() string {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.Status
+	}
+	return http.StatusText(0)
+}
+
+// StatusCode returns HTTPResponse.StatusCode
+func (r CurrentUserResponse) StatusCode() int {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.StatusCode
+	}
+	return 0
+}
+
+// ContentType is a convenience method to retrieve the Content-Type value from the HTTP response headers
+func (r CurrentUserResponse) ContentType() string {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.Header.Get("Content-Type")
+	}
+	return ""
+}
+
 type SetupStatusResponse struct {
 	Body         []byte
 	HTTPResponse *http.Response
@@ -1078,6 +1214,19 @@ func (c *ClientWithResponses) HealthWithResponse(ctx context.Context, reqEditors
 		return nil, err
 	}
 	return ParseHealthResponse(rsp)
+}
+
+// CurrentUserWithResponse performs a GET /api/v1/me (the `CurrentUser` operationId) request.
+//
+// Returns the current user's profile from the database. Requires an authenticated session.
+//
+// Returns a wrapper object for the known response body format(s).
+func (c *ClientWithResponses) CurrentUserWithResponse(ctx context.Context, reqEditors ...RequestEditorFn) (*CurrentUserResponse, error) {
+	rsp, err := c.CurrentUser(ctx, reqEditors...)
+	if err != nil {
+		return nil, err
+	}
+	return ParseCurrentUserResponse(rsp)
 }
 
 // SetupStatusWithResponse performs a GET /api/v1/setup (the `SetupStatus` operationId) request.
@@ -1251,6 +1400,39 @@ func ParseHealthResponse(rsp *http.Response) (*HealthResponse, error) {
 			return nil, err
 		}
 		response.JSON503 = &dest
+
+	}
+
+	return response, nil
+}
+
+// ParseCurrentUserResponse parses an HTTP response from a CurrentUserWithResponse call
+func ParseCurrentUserResponse(rsp *http.Response) (*CurrentUserResponse, error) {
+	bodyBytes, err := io.ReadAll(rsp.Body)
+	defer func() { _ = rsp.Body.Close() }()
+	if err != nil {
+		return nil, err
+	}
+
+	response := &CurrentUserResponse{
+		Body:         bodyBytes,
+		HTTPResponse: rsp,
+	}
+
+	switch {
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 200:
+		var dest MeResponse
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON200 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 401:
+		var dest ProblemDetail
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.ApplicationproblemJSON401 = &dest
 
 	}
 

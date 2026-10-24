@@ -69,6 +69,23 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/me": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** @description Returns the current user's profile from the database. Requires an authenticated session. */
+        get: operations["currentUser"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/setup": {
         parameters: {
             query?: never;
@@ -103,6 +120,22 @@ export interface components {
              * @description At most 72 bytes of UTF-8
              */
             password: string;
+            username: string;
+        };
+        MeResponse: {
+            /** Format: date-time */
+            createdAt: string;
+            /** Format: email */
+            email: string | null;
+            /** Format: uuid */
+            id: string;
+            /**
+             * Format: int64
+             * @description Storage limit in bytes; null means unlimited, zero allows no storage
+             */
+            quotaBytes: number | null;
+            /** @enum {string} */
+            role: "USER" | "ADMIN";
             username: string;
         };
         ProblemDetail: {
@@ -268,6 +301,35 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["Health"];
+                };
+            };
+        };
+    };
+    currentUser: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Current user profile */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["MeResponse"];
+                };
+            };
+            /** @description Authentication required, account disabled or no longer exists */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetail"];
                 };
             };
         };

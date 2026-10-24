@@ -104,6 +104,26 @@ paths:
           description: Database is unavailable
       tags:
       - Health
+  /api/v1/me:
+    get:
+      description: Returns the current user's profile from the database. Requires
+        an authenticated session.
+      operationId: currentUser
+      responses:
+        "200":
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/MeResponse"
+          description: Current user profile
+        "401":
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ProblemDetail"
+          description: "Authentication required, account disabled or no longer exists"
+      tags:
+      - Users
   /api/v1/setup:
     get:
       operationId: setupStatus
@@ -179,6 +199,42 @@ components:
           pattern: "[A-Za-z0-9._-]+"
       required:
       - password
+      - username
+    MeResponse:
+      type: object
+      properties:
+        createdAt:
+          type: string
+          format: date-time
+        email:
+          type:
+          - string
+          - "null"
+          format: email
+        id:
+          type: string
+          format: uuid
+        quotaBytes:
+          type:
+          - integer
+          - "null"
+          format: int64
+          description: "Storage limit in bytes; null means unlimited, zero allows\
+            \ no storage"
+          minimum: 0
+        role:
+          type: string
+          enum:
+          - USER
+          - ADMIN
+        username:
+          type: string
+      required:
+      - createdAt
+      - email
+      - id
+      - quotaBytes
+      - role
       - username
     ProblemDetail:
       type: object

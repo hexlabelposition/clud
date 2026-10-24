@@ -58,7 +58,7 @@ Goal: a multi-user instance with an admin and invite-based registration.
 - [x] **M1-03** First-run setup: API reports whether setup is needed; first account becomes admin
 - [x] **M1-04** Login and logout with Spring Session JDBC; cookie `HttpOnly`, `Secure`, `SameSite=Lax`
 - [x] **M1-05** CSRF protection for cookie-authenticated requests
-- [ ] **M1-06** `GET /api/v1/me`
+- [x] **M1-06** `GET /api/v1/me`
 - [ ] **M1-07** Registration modes `invite` / `open` / `closed` (`CLUD_REGISTRATION_MODE`)
 - [ ] **M1-08** Invites: admin creates an invite via API; registration with invite token; expiry and single use
 - [ ] **M1-09** Login rate limiting
