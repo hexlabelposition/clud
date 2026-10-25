@@ -63,7 +63,7 @@ Goal: a multi-user instance with an admin and invite-based registration.
 - [x] **M1-08** Invites: admin creates an invite via API; registration with invite token; expiry and single use
 - [x] **M1-09** Login and registration rate limiting
 - [x] **M1-10** Change password
-- [ ] **M1-11** Web: first-run setup, login, register with invite, change password, route guard
+- [x] **M1-11** Web: first-run setup, login, register with invite, change password, route guard
 - [ ] **M1-12** Tests: auth flows, CSRF, registration modes
 
 **Done when:** on a fresh instance the admin is created through the setup screen, invites a second user, the second user registers and logs in, and sessions survive a Server restart.

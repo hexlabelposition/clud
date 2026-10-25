@@ -13,7 +13,7 @@ const geistMono = Geist_Mono({
 });
 
 export const metadata: Metadata = {
-  title: "Clud",
+  title: { default: "Clud", template: "%s · Clud" },
   description: "Lightweight cloud file storage",
 };
 

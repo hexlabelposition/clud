@@ -1,21 +1,27 @@
 import { expect, test } from "@playwright/test";
 
-test("home page loads", async ({ page }) => {
+import { MockServer, user } from "./mock-server";
+
+test("home page greets the signed-in user", async ({ page }) => {
+  test.skip(!!process.env.PLAYWRIGHT_BASE_URL, "Uses a mocked API");
+  await MockServer.start(page, { user: user("alice") });
+
   await page.goto("/");
 
   await expect(page).toHaveTitle("Clud");
-  await expect(page.getByRole("heading", { name: "Clud" })).toBeVisible();
+  await expect(
+    page.getByRole("heading", { name: "Welcome, alice" }),
+  ).toBeVisible();
 });
 
 test("shows server health", async ({ page }) => {
   // Without PLAYWRIGHT_BASE_URL there is no Server behind the dev server.
   if (!process.env.PLAYWRIGHT_BASE_URL) {
-    await page.route("/api/v1/health", (route) =>
-      route.fulfill({ json: { status: "UP" } }),
-    );
+    await MockServer.start(page);
   }
 
-  await page.goto("/");
+  // Without a session this is the login screen, or setup on a fresh instance.
+  await page.goto("/login");
 
-  await expect(page.getByRole("status")).toHaveText("Server is up");
+  await expect(page.getByText("Server is up")).toBeVisible();
 });
