@@ -23,7 +23,6 @@ import java.util.concurrent.TimeUnit;
 
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
-import org.junit.jupiter.api.Nested;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.ValueSource;
@@ -35,7 +34,6 @@ import org.springframework.http.MediaType;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.mock.web.MockHttpServletResponse;
 import org.springframework.security.crypto.password.PasswordEncoder;
-import org.springframework.test.context.TestPropertySource;
 import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.transaction.support.TransactionTemplate;
 
@@ -273,36 +271,6 @@ class InviteControllerTests {
 		mvc.perform(post("/api/v1/auth/register").contentType(MediaType.APPLICATION_JSON)
 				.content(registrationBody("Alice", token))).andExpect(status().isForbidden());
 		assertThat(jdbc.queryForObject("SELECT used_at FROM invites", Instant.class)).isNull();
-	}
-
-	@Nested
-	@TestPropertySource(properties = "clud.registration-mode=closed")
-	class Closed {
-
-		@Test
-		void refusesValidInviteWithoutConsumingIt() throws Exception {
-			String token = createInvite();
-			var response = register("Alice", token);
-			assertThat(response.getStatus()).isEqualTo(403);
-			assertThat(json.readTree(response.getContentAsString()).get("type").asString())
-					.isEqualTo(RegistrationController.REGISTRATION_CLOSED);
-			assertThat(jdbc.queryForObject("SELECT used_at FROM invites", Instant.class)).isNull();
-			assertThat(jdbc.queryForObject("SELECT count(*) FROM users", Integer.class)).isEqualTo(1);
-		}
-
-	}
-
-	@Nested
-	@TestPropertySource(properties = "clud.registration-mode=open")
-	class Open {
-
-		@Test
-		void consumesSuppliedInviteAndRefusesItsReuse() throws Exception {
-			String token = createInvite();
-			assertThat(register("Alice", token).getStatus()).isEqualTo(201);
-			assertInvalidInvitation(register("Bob", token), token);
-		}
-
 	}
 
 	private String createInvite() throws Exception {

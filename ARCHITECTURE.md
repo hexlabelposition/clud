@@ -487,6 +487,13 @@ Kubernetes and Helm configuration (a `deploy/` directory) is introduced only whe
 | Storage | one contract test suite run against every provider |
 | Authorization | a matrix of users × permissions × operations |
 
+Security rules covered once for the whole API rather than per endpoint:
+
+- `EndpointSecurityTests` walks every mapped `/api/**` endpoint. Anonymous requests must receive `401` unless the endpoint is in its public list, and state-changing requests without a valid CSRF token must receive `403` before reaching a controller unless the endpoint is in its exempt list. A new public or CSRF-exempt endpoint, e.g. public links in M4, needs a deliberate entry there. When PAT authentication arrives (M3-02), it must keep these checks for cookie sessions and add one that Bearer requests skip CSRF.
+- `CsrfTests` covers the token itself: bound to the issuing session, every masked copy accepted, reusable until logout.
+- `RegistrationModeTests` is the matrix of registration modes: discovery, setup, registration with and without invitations, and invite creation in `invite`, `open` and `closed`.
+- `AuthFlowTests` runs the M1 journey over real HTTP, including a Server restart between login and use of the sessions.
+
 ---
 
 ## 15. Architecture evolution
