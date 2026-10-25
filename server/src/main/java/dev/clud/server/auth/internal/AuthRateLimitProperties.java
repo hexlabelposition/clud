@@ -14,6 +14,7 @@ import jakarta.validation.constraints.Min;
 record AuthRateLimitProperties(
 		@DefaultValue("10") @Min(1) int loginRequests,
 		@DefaultValue("5") @Min(1) int registerRequests,
+		@DefaultValue("5") @Min(1) int passwordRequests,
 		@DefaultValue("60") @Min(1) int csrfRequests,
 		@DefaultValue("60") @Min(1) @Max(86400) int windowSeconds,
 		@DefaultValue("10000") @Min(1) @Max(1000000) int maxBuckets,

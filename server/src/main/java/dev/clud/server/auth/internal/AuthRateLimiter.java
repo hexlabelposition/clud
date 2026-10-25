@@ -58,12 +58,13 @@ class AuthRateLimiter {
 	}
 
 	enum Endpoint {
-		LOGIN, REGISTER, CSRF;
+		LOGIN, REGISTER, PASSWORD, CSRF;
 
 		int limit(AuthRateLimitProperties properties) {
 			return switch (this) {
 				case LOGIN -> properties.loginRequests();
 				case REGISTER -> properties.registerRequests();
+				case PASSWORD -> properties.passwordRequests();
 				case CSRF -> properties.csrfRequests();
 			};
 		}

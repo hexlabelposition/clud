@@ -27,6 +27,8 @@ class AuthRateLimitFilter extends OncePerRequestFilter {
 
 	private static final PathPattern REGISTER = PathPatternParser.defaultInstance.parse("/api/v1/auth/register");
 
+	private static final PathPattern PASSWORD = PathPatternParser.defaultInstance.parse("/api/v1/auth/password");
+
 	private static final PathPattern CSRF = PathPatternParser.defaultInstance.parse("/api/v1/auth/csrf");
 
 	private final AuthRateLimiter limiter;
@@ -65,6 +67,9 @@ class AuthRateLimitFilter extends OncePerRequestFilter {
 			}
 			if (REGISTER.matches(path)) {
 				return Endpoint.REGISTER;
+			}
+			if (PASSWORD.matches(path)) {
+				return Endpoint.PASSWORD;
 			}
 		}
 		if ((request.getMethod().equals("GET") || request.getMethod().equals("HEAD")) && CSRF.matches(path)) {

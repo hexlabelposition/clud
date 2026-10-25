@@ -12,7 +12,7 @@ import org.springframework.mock.web.MockHttpServletRequest;
 class ClientAddressResolverTests {
 
 	private final ClientAddressResolver resolver = new ClientAddressResolver(
-			new AuthRateLimitProperties(10, 5, 60, 60, 100, List.of("10.0.0.0/8", "::1/128")));
+			new AuthRateLimitProperties(10, 5, 5, 60, 60, 100, List.of("10.0.0.0/8", "::1/128")));
 
 	@Test
 	void ignoresSpoofedHeadersFromUntrustedPeer() {
@@ -24,7 +24,7 @@ class ClientAddressResolverTests {
 
 	@Test
 	void trustsNoProxyByDefault() {
-		var untrusted = new ClientAddressResolver(new AuthRateLimitProperties(10, 5, 60, 60, 100, List.of()));
+		var untrusted = new ClientAddressResolver(new AuthRateLimitProperties(10, 5, 5, 60, 60, 100, List.of()));
 		assertThat(untrusted.resolve(request("10.0.0.1", "192.0.2.1"))).isEqualTo("10.0.0.1");
 	}
 
@@ -38,7 +38,7 @@ class ClientAddressResolverTests {
 
 	@Test
 	void groupsIpv6ClientsByTheirSlash64() {
-		var untrusted = new ClientAddressResolver(new AuthRateLimitProperties(10, 5, 60, 60, 100, List.of()));
+		var untrusted = new ClientAddressResolver(new AuthRateLimitProperties(10, 5, 5, 60, 60, 100, List.of()));
 		String key = untrusted.resolve(request("2001:db8:1:2::1", null));
 		assertThat(key).isEqualTo("2001:db8:1:2:0:0:0:0/64");
 		assertThat(untrusted.resolve(request("2001:db8:1:2:ffff:ffff:ffff:ffff", null))).isEqualTo(key);

@@ -23,7 +23,7 @@ class AuthRateLimiterTests {
 	private final Instant start = Instant.parse("2026-10-24T12:00:00Z");
 
 	private final AuthRateLimiter limiter = new AuthRateLimiter(
-			new AuthRateLimitProperties(2, 1, 3, 60, 4, List.of()), clock);
+			new AuthRateLimitProperties(2, 1, 1, 3, 60, 4, List.of()), clock);
 
 	@Test
 	void keepsSeparateLimitsPerAddressAndEndpoint() {

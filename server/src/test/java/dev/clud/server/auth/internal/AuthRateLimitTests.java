@@ -40,6 +40,7 @@ import tools.jackson.databind.ObjectMapper;
 		"clud.registration-mode=open",
 		"clud.auth.rate-limit.login-requests=2",
 		"clud.auth.rate-limit.register-requests=2",
+		"clud.auth.rate-limit.password-requests=2",
 		"clud.auth.rate-limit.csrf-requests=2",
 		"clud.auth.rate-limit.window-seconds=60",
 		"clud.auth.rate-limit.trusted-proxies=10.0.0.0/8" })
@@ -143,6 +144,47 @@ class AuthRateLimitTests {
 		}
 		verify(passwords, times(2)).encode(any(CharSequence.class));
 		assertThat(jdbc.queryForObject("SELECT count(*) FROM users", Integer.class)).isEqualTo(1);
+	}
+
+	@Test
+	void limitsPasswordChangesBeforeVerifyingTheCurrentPassword() throws Exception {
+		var csrfResponse = mvc.perform(get("/api/v1/auth/csrf").with(request -> {
+			request.setRemoteAddr(address);
+			return request;
+		})).andExpect(status().isOk()).andReturn().getResponse();
+		var token = json.readTree(csrfResponse.getContentAsString());
+		var cookie = mvc.perform(post("/api/v1/auth/login").with(request -> {
+			request.setRemoteAddr(address);
+			return request;
+		}).cookie(csrfResponse.getCookie("SESSION"))
+				.header(token.get("headerName").asString(), token.get("token").asString())
+				.contentType(MediaType.APPLICATION_JSON)
+				.content(json.writeValueAsString(Map.of("username", "Alice", "password", "password"))))
+				.andExpect(status().isNoContent()).andReturn().getResponse().getCookie("SESSION");
+		clearInvocations(passwords);
+		var sessionToken = json.readTree(mvc.perform(get("/api/v1/auth/csrf").cookie(cookie).with(request -> {
+			request.setRemoteAddr(address);
+			return request;
+		})).andExpect(status().isOk()).andReturn().getResponse().getContentAsString());
+		for (int i = 0; i < 3; i++) {
+			var response = mvc.perform(post("/api/v1/auth/password").with(request -> {
+				request.setRemoteAddr(address);
+				return request;
+			}).cookie(cookie).header(sessionToken.get("headerName").asString(), sessionToken.get("token").asString())
+					.contentType(MediaType.APPLICATION_JSON)
+					.content(json.writeValueAsString(Map.of("currentPassword", "wrong", "newPassword", "replacement"))))
+					.andReturn().getResponse();
+			assertThat(response.getStatus()).isEqualTo(i < 2 ? 400 : 429);
+			if (i == 2) {
+				// The problem instance names the endpoint, so check the submitted
+				// values instead of the word "password".
+				assertThat(response.getHeader("Retry-After")).isNotNull();
+				assertThat(json.readTree(response.getContentAsString()).get("type").asString())
+						.isEqualTo(AuthRateLimitFilter.RATE_LIMIT_EXCEEDED);
+				assertThat(response.getContentAsString()).doesNotContain("wrong", "replacement", address);
+			}
+		}
+		verify(passwords, times(2)).matches(any(CharSequence.class), anyString());
 	}
 
 	@Test

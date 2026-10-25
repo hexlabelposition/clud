@@ -75,6 +75,15 @@ func (e RegistrationStatusMode) Valid() bool {
 	}
 }
 
+// ChangePasswordRequest defines model for ChangePasswordRequest.
+type ChangePasswordRequest struct {
+	// CurrentPassword At most 72 bytes of UTF-8
+	CurrentPassword string `json:"currentPassword"`
+
+	// NewPassword Non-blank password, at most 72 bytes of UTF-8
+	NewPassword string `json:"newPassword"`
+}
+
 // CreateInviteRequest defines model for CreateInviteRequest.
 type CreateInviteRequest struct {
 	// ExpiresAt Future expiry, at most 90 days ahead; defaults to seven days from creation
@@ -188,6 +197,12 @@ type LogoutParams struct {
 	XCSRFTOKEN string `json:"X-CSRF-TOKEN"`
 }
 
+// ChangePasswordParams defines parameters for ChangePassword.
+type ChangePasswordParams struct {
+	// XCSRFTOKEN Token from GET /api/v1/auth/csrf
+	XCSRFTOKEN string `json:"X-CSRF-TOKEN"`
+}
+
 // RegisterParams defines parameters for Register.
 type RegisterParams struct {
 	// XCSRFTOKEN Token from GET /api/v1/auth/csrf
@@ -199,6 +214,9 @@ type CreateInviteJSONRequestBody = CreateInviteRequest
 
 // LoginJSONRequestBody defines body for Login for application/json ContentType.
 type LoginJSONRequestBody = LoginRequest
+
+// ChangePasswordJSONRequestBody defines body for ChangePassword for application/json ContentType.
+type ChangePasswordJSONRequestBody = ChangePasswordRequest
 
 // RegisterJSONRequestBody defines body for Register for application/json ContentType.
 type RegisterJSONRequestBody = RegistrationRequest
@@ -436,6 +454,18 @@ type ClientInterface interface {
 	// Logout performs a POST /api/v1/auth/logout (the `Logout` operationId) request.
 	Logout(ctx context.Context, params *LogoutParams, reqEditors ...RequestEditorFn) (*http.Response, error)
 
+	// ChangePasswordWithBody performs a POST /api/v1/auth/password (the `ChangePassword` operationId) request,
+	// with any type of body and a specified content type.
+	//
+	// Changes the authenticated user's password after verifying the current password. Other sessions are revoked. The current session continues under a new ID; keep the new SESSION cookie. Its CSRF token remains valid.
+	ChangePasswordWithBody(ctx context.Context, params *ChangePasswordParams, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*http.Response, error)
+
+	// ChangePassword performs a POST /api/v1/auth/password (the `ChangePassword` operationId) request.
+	// Takes a body of the `application/json` content type.
+	//
+	// Changes the authenticated user's password after verifying the current password. Other sessions are revoked. The current session continues under a new ID; keep the new SESSION cookie. Its CSRF token remains valid.
+	ChangePassword(ctx context.Context, params *ChangePasswordParams, body ChangePasswordJSONRequestBody, reqEditors ...RequestEditorFn) (*http.Response, error)
+
 	// RegisterWithBody performs a POST /api/v1/auth/register (the `Register` operationId) request,
 	// with any type of body and a specified content type.
 	//
@@ -551,6 +581,38 @@ func (c *Client) Login(ctx context.Context, params *LoginParams, body LoginJSONR
 // Logout performs a POST /api/v1/auth/logout (the `Logout` operationId) request.
 func (c *Client) Logout(ctx context.Context, params *LogoutParams, reqEditors ...RequestEditorFn) (*http.Response, error) {
 	req, err := NewLogoutRequest(c.Server, params)
+	if err != nil {
+		return nil, err
+	}
+	req = req.WithContext(ctx)
+	if err := c.applyEditors(ctx, req, reqEditors); err != nil {
+		return nil, err
+	}
+	return c.Client.Do(req)
+}
+
+// ChangePasswordWithBody performs a POST /api/v1/auth/password (the `ChangePassword` operationId) request,
+// with any type of body and a specified content type.
+//
+// Changes the authenticated user's password after verifying the current password. Other sessions are revoked. The current session continues under a new ID; keep the new SESSION cookie. Its CSRF token remains valid.
+func (c *Client) ChangePasswordWithBody(ctx context.Context, params *ChangePasswordParams, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*http.Response, error) {
+	req, err := NewChangePasswordRequestWithBody(c.Server, params, contentType, body)
+	if err != nil {
+		return nil, err
+	}
+	req = req.WithContext(ctx)
+	if err := c.applyEditors(ctx, req, reqEditors); err != nil {
+		return nil, err
+	}
+	return c.Client.Do(req)
+}
+
+// ChangePassword performs a POST /api/v1/auth/password (the `ChangePassword` operationId) request.
+// Takes a body of the `application/json` content type.
+//
+// Changes the authenticated user's password after verifying the current password. Other sessions are revoked. The current session continues under a new ID; keep the new SESSION cookie. Its CSRF token remains valid.
+func (c *Client) ChangePassword(ctx context.Context, params *ChangePasswordParams, body ChangePasswordJSONRequestBody, reqEditors ...RequestEditorFn) (*http.Response, error) {
+	req, err := NewChangePasswordRequest(c.Server, params, body)
 	if err != nil {
 		return nil, err
 	}
@@ -850,6 +912,59 @@ func NewLogoutRequest(server string, params *LogoutParams) (*http.Request, error
 	return req, nil
 }
 
+// NewChangePasswordRequest calls the generic ChangePassword builder with application/json body
+func NewChangePasswordRequest(server string, params *ChangePasswordParams, body ChangePasswordJSONRequestBody) (*http.Request, error) {
+	var bodyReader io.Reader
+	buf, err := json.Marshal(body)
+	if err != nil {
+		return nil, err
+	}
+	bodyReader = bytes.NewReader(buf)
+	return NewChangePasswordRequestWithBody(server, params, "application/json", bodyReader)
+}
+
+// NewChangePasswordRequestWithBody constructs an http.Request for the ChangePassword method, with any body, and a specified content type
+func NewChangePasswordRequestWithBody(server string, params *ChangePasswordParams, contentType string, body io.Reader) (*http.Request, error) {
+	var err error
+
+	serverURL, err := url.Parse(server)
+	if err != nil {
+		return nil, err
+	}
+
+	operationPath := fmt.Sprintf("/api/v1/auth/password")
+	if operationPath[0] == '/' {
+		operationPath = "." + operationPath
+	}
+
+	queryURL, err := serverURL.Parse(operationPath)
+	if err != nil {
+		return nil, err
+	}
+
+	req, err := http.NewRequest(http.MethodPost, queryURL.String(), body)
+	if err != nil {
+		return nil, err
+	}
+
+	req.Header.Add("Content-Type", contentType)
+
+	if params != nil {
+
+		var headerParam0 string
+
+		headerParam0, err = runtime.StyleParamWithOptions("simple", false, "X-CSRF-TOKEN", params.XCSRFTOKEN, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationHeader, Type: "string", Format: ""})
+		if err != nil {
+			return nil, err
+		}
+
+		req.Header.Set("X-CSRF-TOKEN", headerParam0)
+
+	}
+
+	return req, nil
+}
+
 // NewRegisterRequest calls the generic Register builder with application/json body
 func NewRegisterRequest(server string, params *RegisterParams, body RegisterJSONRequestBody) (*http.Request, error) {
 	var bodyReader io.Reader
@@ -1131,6 +1246,20 @@ type ClientWithResponsesInterface interface {
 	// Returns a wrapper object for the known response body format(s).
 	LogoutWithResponse(ctx context.Context, params *LogoutParams, reqEditors ...RequestEditorFn) (*LogoutResponse, error)
 
+	// ChangePasswordWithBodyWithResponse performs a POST /api/v1/auth/password (the `ChangePassword` operationId) request,
+	// with any type of body and a specified content type.
+	//
+	// Changes the authenticated user's password after verifying the current password. Other sessions are revoked. The current session continues under a new ID; keep the new SESSION cookie. Its CSRF token remains valid.
+	//
+	// Returns a wrapper object for the known response body format(s).
+	ChangePasswordWithBodyWithResponse(ctx context.Context, params *ChangePasswordParams, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*ChangePasswordResponse, error)
+
+	// ChangePasswordWithResponse performs a POST /api/v1/auth/password (the `ChangePassword` operationId) request.
+	// Takes a body of the `application/json` content type, and returns a wrapper object for the known response body format(s).
+	//
+	// Changes the authenticated user's password after verifying the current password. Other sessions are revoked. The current session continues under a new ID; keep the new SESSION cookie. Its CSRF token remains valid.
+	ChangePasswordWithResponse(ctx context.Context, params *ChangePasswordParams, body ChangePasswordJSONRequestBody, reqEditors ...RequestEditorFn) (*ChangePasswordResponse, error)
+
 	// RegisterWithBodyWithResponse performs a POST /api/v1/auth/register (the `Register` operationId) request,
 	// with any type of body and a specified content type.
 	//
@@ -1408,6 +1537,89 @@ func (r LogoutResponse) StatusCode() int {
 
 // ContentType is a convenience method to retrieve the Content-Type value from the HTTP response headers
 func (r LogoutResponse) ContentType() string {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.Header.Get("Content-Type")
+	}
+	return ""
+}
+
+// ChangePasswordResponse204Headers the declared response headers of an HTTP 204 response for ChangePassword
+type ChangePasswordResponse204Headers struct {
+	SetCookie *string
+}
+
+// ChangePasswordResponse429Headers the declared response headers of an HTTP 429 response for ChangePassword
+type ChangePasswordResponse429Headers struct {
+	RetryAfter *int64
+}
+
+type ChangePasswordResponse struct {
+	Body         []byte
+	HTTPResponse *http.Response
+	// ApplicationproblemJSON400 the response for an HTTP 400 `application/problem+json` response
+	ApplicationproblemJSON400 *ProblemDetail
+	// ApplicationproblemJSON401 the response for an HTTP 401 `application/problem+json` response
+	ApplicationproblemJSON401 *ProblemDetail
+	// ApplicationproblemJSON403 the response for an HTTP 403 `application/problem+json` response
+	ApplicationproblemJSON403 *ProblemDetail
+	// ApplicationproblemJSON409 the response for an HTTP 409 `application/problem+json` response
+	ApplicationproblemJSON409 *ProblemDetail
+	// ApplicationproblemJSON429 the response for an HTTP 429 `application/problem+json` response
+	ApplicationproblemJSON429 *ProblemDetail
+	// Headers204 the parsed response headers for an HTTP 204 response
+	Headers204 *ChangePasswordResponse204Headers
+	// Headers429 the parsed response headers for an HTTP 429 response
+	Headers429 *ChangePasswordResponse429Headers
+}
+
+// GetApplicationproblemJSON400 returns the response for an HTTP 400 `application/problem+json` response
+func (r ChangePasswordResponse) GetApplicationproblemJSON400() *ProblemDetail {
+	return r.ApplicationproblemJSON400
+}
+
+// GetApplicationproblemJSON401 returns the response for an HTTP 401 `application/problem+json` response
+func (r ChangePasswordResponse) GetApplicationproblemJSON401() *ProblemDetail {
+	return r.ApplicationproblemJSON401
+}
+
+// GetApplicationproblemJSON403 returns the response for an HTTP 403 `application/problem+json` response
+func (r ChangePasswordResponse) GetApplicationproblemJSON403() *ProblemDetail {
+	return r.ApplicationproblemJSON403
+}
+
+// GetApplicationproblemJSON409 returns the response for an HTTP 409 `application/problem+json` response
+func (r ChangePasswordResponse) GetApplicationproblemJSON409() *ProblemDetail {
+	return r.ApplicationproblemJSON409
+}
+
+// GetApplicationproblemJSON429 returns the response for an HTTP 429 `application/problem+json` response
+func (r ChangePasswordResponse) GetApplicationproblemJSON429() *ProblemDetail {
+	return r.ApplicationproblemJSON429
+}
+
+// GetBody returns the raw response body bytes
+func (r ChangePasswordResponse) GetBody() []byte {
+	return r.Body
+}
+
+// Status returns HTTPResponse.Status
+func (r ChangePasswordResponse) Status() string {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.Status
+	}
+	return http.StatusText(0)
+}
+
+// StatusCode returns HTTPResponse.StatusCode
+func (r ChangePasswordResponse) StatusCode() int {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.StatusCode
+	}
+	return 0
+}
+
+// ContentType is a convenience method to retrieve the Content-Type value from the HTTP response headers
+func (r ChangePasswordResponse) ContentType() string {
 	if r.HTTPResponse != nil {
 		return r.HTTPResponse.Header.Get("Content-Type")
 	}
@@ -1781,6 +1993,32 @@ func (c *ClientWithResponses) LogoutWithResponse(ctx context.Context, params *Lo
 	return ParseLogoutResponse(rsp)
 }
 
+// ChangePasswordWithBodyWithResponse performs a POST /api/v1/auth/password (the `ChangePassword` operationId) request,
+// with any type of body and a specified content type.
+//
+// Changes the authenticated user's password after verifying the current password. Other sessions are revoked. The current session continues under a new ID; keep the new SESSION cookie. Its CSRF token remains valid.
+//
+// Returns a wrapper object for the known response body format(s).
+func (c *ClientWithResponses) ChangePasswordWithBodyWithResponse(ctx context.Context, params *ChangePasswordParams, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*ChangePasswordResponse, error) {
+	rsp, err := c.ChangePasswordWithBody(ctx, params, contentType, body, reqEditors...)
+	if err != nil {
+		return nil, err
+	}
+	return ParseChangePasswordResponse(rsp)
+}
+
+// ChangePasswordWithResponse performs a POST /api/v1/auth/password (the `ChangePassword` operationId) request.
+// Takes a body of the `application/json` content type, and returns a wrapper object for the known response body format(s).
+//
+// Changes the authenticated user's password after verifying the current password. Other sessions are revoked. The current session continues under a new ID; keep the new SESSION cookie. Its CSRF token remains valid.
+func (c *ClientWithResponses) ChangePasswordWithResponse(ctx context.Context, params *ChangePasswordParams, body ChangePasswordJSONRequestBody, reqEditors ...RequestEditorFn) (*ChangePasswordResponse, error) {
+	rsp, err := c.ChangePassword(ctx, params, body, reqEditors...)
+	if err != nil {
+		return nil, err
+	}
+	return ParseChangePasswordResponse(rsp)
+}
+
 // RegisterWithBodyWithResponse performs a POST /api/v1/auth/register (the `Register` operationId) request,
 // with any type of body and a specified content type.
 //
@@ -2067,6 +2305,86 @@ func ParseLogoutResponse(rsp *http.Response) (*LogoutResponse, error) {
 		}
 		response.ApplicationproblemJSON403 = &dest
 
+	}
+
+	return response, nil
+}
+
+// ParseChangePasswordResponse parses an HTTP response from a ChangePasswordWithResponse call
+func ParseChangePasswordResponse(rsp *http.Response) (*ChangePasswordResponse, error) {
+	bodyBytes, err := io.ReadAll(rsp.Body)
+	defer func() { _ = rsp.Body.Close() }()
+	if err != nil {
+		return nil, err
+	}
+
+	response := &ChangePasswordResponse{
+		Body:         bodyBytes,
+		HTTPResponse: rsp,
+	}
+
+	switch {
+	case rsp.StatusCode == 204:
+		break // No content-type
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 400:
+		var dest ProblemDetail
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.ApplicationproblemJSON400 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 401:
+		var dest ProblemDetail
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.ApplicationproblemJSON401 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 403:
+		var dest ProblemDetail
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.ApplicationproblemJSON403 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 409:
+		var dest ProblemDetail
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.ApplicationproblemJSON409 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 429:
+		var dest ProblemDetail
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.ApplicationproblemJSON429 = &dest
+
+	}
+
+	switch {
+	case rsp.StatusCode == 204:
+		var headers ChangePasswordResponse204Headers
+		if values := rsp.Header.Values("Set-Cookie"); len(values) > 0 {
+			var value string
+			if err := runtime.BindStyledParameterWithOptions("simple", "Set-Cookie", values[0], &value, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationHeader, Explode: false, Required: false, Type: "string", Format: ""}); err != nil {
+				return nil, err
+			}
+			headers.SetCookie = &value
+		}
+		response.Headers204 = &headers
+	case rsp.StatusCode == 429:
+		var headers ChangePasswordResponse429Headers
+		if values := rsp.Header.Values("Retry-After"); len(values) > 0 {
+			var value int64
+			if err := runtime.BindStyledParameterWithOptions("simple", "Retry-After", values[0], &value, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationHeader, Explode: false, Required: false, Type: "integer", Format: "int64"}); err != nil {
+				return nil, err
+			}
+			headers.RetryAfter = &value
+		}
+		response.Headers429 = &headers
 	}
 
 	return response, nil

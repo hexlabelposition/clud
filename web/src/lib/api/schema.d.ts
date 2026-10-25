@@ -70,6 +70,23 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/auth/password": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** @description Changes the authenticated user's password after verifying the current password. Other sessions are revoked. The current session continues under a new ID; keep the new SESSION cookie. Its CSRF token remains valid. */
+        post: operations["changePassword"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/auth/register": {
         parameters: {
             query?: never;
@@ -157,6 +174,18 @@ export interface paths {
 export type webhooks = Record<string, never>;
 export interface components {
     schemas: {
+        ChangePasswordRequest: {
+            /**
+             * Format: password
+             * @description At most 72 bytes of UTF-8
+             */
+            currentPassword: string;
+            /**
+             * Format: password
+             * @description Non-blank password, at most 72 bytes of UTF-8
+             */
+            newPassword: string;
+        };
         CreateInviteRequest: {
             /**
              * Format: date-time
@@ -427,6 +456,79 @@ export interface operations {
             /** @description Missing or invalid CSRF token */
             403: {
                 headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetail"];
+                };
+            };
+        };
+    };
+    changePassword: {
+        parameters: {
+            query?: never;
+            header: {
+                /** @description Token from GET /api/v1/auth/csrf */
+                "X-CSRF-TOKEN": string;
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["ChangePasswordRequest"];
+            };
+        };
+        responses: {
+            /** @description Password changed; session ID rotated and other sessions revoked */
+            204: {
+                headers: {
+                    /** @description New SESSION cookie; HttpOnly, Secure, SameSite=Lax */
+                    "Set-Cookie"?: string;
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Invalid request or incorrect current password */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetail"];
+                };
+            };
+            /** @description Authentication required, account disabled or no longer exists */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetail"];
+                };
+            };
+            /** @description Missing or invalid CSRF token */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetail"];
+                };
+            };
+            /** @description Password changed concurrently; retry with current credentials */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetail"];
+                };
+            };
+            /** @description Client IP rate limit exceeded; retry after the indicated seconds */
+            429: {
+                headers: {
+                    "Retry-After"?: number;
                     [name: string]: unknown;
                 };
                 content: {
